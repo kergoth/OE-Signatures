@@ -24,12 +24,8 @@ class VariableRef(object):
 
     def __str__(self):
         name = str(self.components)
-        variables = self.metadata.getVar("__variables", False)
-        if variables and name in variables:
-            var = variables[name]
-        else:
-            var = Value(self.metadata.getVar(name, False), self.metadata)
-        return str(var)
+        value = Value(self.metadata.getVar(name, False), self.metadata)
+        return str(value)
 
 class PythonValue(object):
     """Lazy evaluation of a python snippet in the form of a Components object"""
