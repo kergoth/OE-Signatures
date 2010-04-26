@@ -7,7 +7,7 @@ import bb.data
 class Components(list):
     """A list of components, which concatenates itself upon str(), and runs
     str() on each component.  A given component is defined as being either a
-    string or a variable reference"""
+    string, python snippet, or variable reference"""
 
     def __str__(self):
         return "".join(str(v) for v in self)
