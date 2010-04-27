@@ -1,14 +1,16 @@
 """Staging area for OE python bits for kergoth"""
 
 import re
+import shlex
+from StringIO import StringIO
 from collections import deque
 import bb.msg
 import bb.utils
 
 class Components(list):
     """A list of components, which concatenates itself upon str(), and runs
-    str() on each component.  A given component is defined as being either a
-    string or a variable reference"""
+    str() on each component.  A given component is defined as being a
+    string, python snippet, or variable reference"""
 
     def __str__(self):
         return "".join(str(v) for v in self)
@@ -33,8 +35,13 @@ class VariableRef(object):
         if variables and name in variables:
             var = variables[name]
         else:
-            var = Value(self.metadata.getVar(name, False), self.metadata)
+            value = self.metadata.getVar(name, False)
+            if value is None:
+                return "${%s}" % name
+
+            var = Value(value, self.metadata)
         return str(var)
+
 
 class PythonValue(object):
     """Lazy evaluation of a python snippet in the form of a Components object"""
@@ -47,7 +54,7 @@ class PythonValue(object):
         code = str(self.components)
         codeobj = compile(code.strip(), "<expansion>", "eval")
         try:
-            value = bb.utils.better_eval(codeobj, {"d": self.metadata})
+            value = str(bb.utils.better_eval(codeobj, {"d": self.metadata}))
         except Exception, exc:
             bb.msg.note(1, bb.msg.domain.Data,
                         "%s:%s while evaluating:\n%s" % (type(exc), exc,
@@ -89,10 +96,8 @@ class Value(object):
     def parse(self):
         """Parse a value from the OE metadata into a Components object"""
 
-        if not isinstance(self.value, basestring):
-            return
-
-        if "${" not in self.value:
+        if not isinstance(self.value, basestring) or \
+           "${" not in self.value:
             self.components = self.value
             return
 
