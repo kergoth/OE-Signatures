@@ -84,8 +84,10 @@ shelldata = """
     a=b
     c=d
     (
+        true && false
         test -f foo
-    )
+    ) || aiee
+    ! inverted
 """
 if __name__ == "__main__":
     tokens, script = pyshyacc.parse(shelldata, True, False)
@@ -94,7 +96,9 @@ if __name__ == "__main__":
     for token in tokens:
         process(token)
     cmds = set(cmd for cmd in cmdnames if cmd not in excluded)
-    assert(cmds == set(["bar", "echo", "heh", "moo", "test"]))
+    print(cmds)
+    assert(cmds == set(["bar", "echo", "heh", "moo", "test", "aiee", "true",
+                        "false", "inverted"]))
 
     d = bb.data.init()
     d["foo"] = "value of foo"
