@@ -148,8 +148,11 @@ def _compare_name(strparts, node):
     #    return True
     return False
 
-def compare_name(strval, node):
-    return _compare_name(tuple(reversed(strval.split("."))), node)
+def compare_name(value, node):
+    if isinstance(value, basestring):
+        return _compare_name(tuple(reversed(value.split("."))), node)
+    else:
+        return any(compare_name(item, node) for item in value)
 
 pydata = """
 bb.data.getVar('somevar', d, True)
@@ -173,17 +176,21 @@ def test_python():
 
         def visit_Call(self, node):
             ast.NodeVisitor.generic_visit(self, node)
-            if compare_name("d.getVar", node.func) or \
-               compare_name("bb.data.getVar", node.func):
-               if node.args and \
-                  isinstance(node.args[0], ast.Str):
-                self.var_references.add(node.args[0].s)
-            elif compare_name("bb.data.expand", node.func) or \
-                 compare_name("d.expand", node.func):
+            if compare_name(("d.getVar", "bb.data.getVar"), node.func):
+                if isinstance(node.args[0], ast.Str):
+                    self.var_references.add(node.args[0].s)
+                else:
+                    print("Warning: call to getVar() with a non-literal-string first argument, unable to track variable reference.")
+            elif compare_name(("d.expand", "bb.data.expand"), node.func):
                 if isinstance(node.args[0], ast.Str):
                     value = oe.kergoth.Value(node.args[0].s, bb.data.init())
                     for var in value.references():
                         self.var_references.add(var)
+                elif isinstance(node.args[0], ast.Call) and \
+                     compare_name(("d.getVar", "bb.data.getVar"), node.args[0].func):
+                    pass
+                else:
+                    print("Warning: call to expand() with a non-literal-string first argument, unable to track variable reference.")
             elif isinstance(node.func, ast.Name):
                 self.direct_func_calls.add(node.func.id)
 
