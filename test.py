@@ -178,13 +178,19 @@ def test_python():
                if node.args and \
                   isinstance(node.args[0], ast.Str):
                 self.var_references.add(node.args[0].s)
+            elif compare_name("bb.data.expand", node.func) or \
+                 compare_name("d.expand", node.func):
+                if isinstance(node.args[0], ast.Str):
+                    value = oe.kergoth.Value(node.args[0].s, bb.data.init())
+                    for var in value.references():
+                        self.var_references.add(var)
             elif isinstance(node.func, ast.Name):
                 self.direct_func_calls.add(node.func.id)
 
     code = compile(pydata, "<string>", "exec", ast.PyCF_ONLY_AST)
     visitor = Visit()
     visitor.visit(code)
-    assert(visitor.var_references == set(["bar", "somevar", "something"]))
+    assert(visitor.var_references == set(["bar", "somevar", "something", "inexpand"]))
     assert(visitor.direct_func_calls == set(["test2"]))
 
 
