@@ -14,6 +14,34 @@ import oe.kergoth
 from pysh import pyshyacc, pyshlex, interp
 
 
+def test_var_expansion():
+    d = bb.data.init()
+    d["foo"] = "value of foo"
+    d["bar"] = "value of bar"
+    d["value of foo"] = "value of 'value of foo'"
+
+    val = oe.kergoth.Value("${foo}", d)
+    assert(str(val) == "value of foo")
+    assert(list(val.references()) == ["foo"])
+
+    val = oe.kergoth.Value("${${foo}}", d)
+    assert(str(val) == "value of 'value of foo'")
+    assert(list(val.references()) == ["foo"])
+
+    val = oe.kergoth.Value("${${foo}} ${bar}", d)
+    assert(str(val) == "value of 'value of foo' value of bar")
+    assert(list(val.references()) == ["foo", "bar"])
+
+    val = oe.kergoth.Value("${@5*12}", d)
+    assert(str(val) == "60")
+    assert(not list(val.references()))
+
+    val = oe.kergoth.Value("${@'boo ' + '${foo}'}", d)
+    assert(str(val) == "boo value of foo")
+    assert(list(val.references()) == ["foo"])
+
+
+cmdnames = set()
 def process_words(words):
     for word in list(words):
         wtree = pyshlex.make_wordtree(word[1])
@@ -43,6 +71,7 @@ def process_words(words):
             else:
                 cmdnames.add(cmd)
 
+funcdefs = set()
 def process(tokens):
     for token in tokens:
         (name, value) = token
@@ -74,6 +103,34 @@ def process(tokens):
             process((value.cmd,))
         else:
             raise NotImplementedError("Unsupported token type " + name)
+
+shelldata = """
+    foo () {
+        bar
+    }
+    {
+        echo baz
+        $(heh)
+        eval `moo`
+    }
+    a=b
+    c=d
+    (
+        true && false
+        test -f foo
+        testval=something
+        $testval
+    ) || aiee
+    ! inverted
+"""
+
+def test_shell():
+    tokens, script = pyshyacc.parse(shelldata, True, False)
+    for token in tokens:
+        process(token)
+    cmds = set(cmd for cmd in cmdnames if cmd not in funcdefs)
+    assert(cmds == set(["bar", "echo", "heh", "moo", "test", "aiee", "true",
+                        "false", "inverted"]))
 
 
 def _compare_name(strparts, node):
@@ -131,59 +188,8 @@ def test_python():
     assert(visitor.direct_func_calls == set(["test2"]))
 
 
-shelldata = """
-    foo () {
-        bar
-    }
-    {
-        echo baz
-        $(heh)
-        eval `moo`
-    }
-    a=b
-    c=d
-    (
-        true && false
-        test -f foo
-        testval=something
-        $testval
-    ) || aiee
-    ! inverted
-"""
-
 if __name__ == "__main__":
-    tokens, script = pyshyacc.parse(shelldata, True, False)
-    cmdnames = set()
-    funcdefs = set()
-    for token in tokens:
-        process(token)
-    cmds = set(cmd for cmd in cmdnames if cmd not in funcdefs)
-    assert(cmds == set(["bar", "echo", "heh", "moo", "test", "aiee", "true",
-                        "false", "inverted"]))
-
-    d = bb.data.init()
-    d["foo"] = "value of foo"
-    d["bar"] = "value of bar"
-    d["value of foo"] = "value of 'value of foo'"
-
-    val = oe.kergoth.Value("${foo}", d)
-    assert(str(val) == "value of foo")
-    assert(list(val.references()) == ["foo"])
-
-    val = oe.kergoth.Value("${${foo}}", d)
-    assert(str(val) == "value of 'value of foo'")
-    assert(list(val.references()) == ["foo"])
-
-    val = oe.kergoth.Value("${${foo}} ${bar}", d)
-    assert(str(val) == "value of 'value of foo' value of bar")
-    assert(list(val.references()) == ["foo", "bar"])
-
-    val = oe.kergoth.Value("${@5*12}", d)
-    assert(str(val) == "60")
-    assert(not list(val.references()))
-
-    val = oe.kergoth.Value("${@'boo ' + '${foo}'}", d)
-    assert(str(val) == "boo value of foo")
-    assert(list(val.references()) == ["foo"])
-
-    test_python()
+    for name, value in globals().items():
+        if name.startswith("test_") and \
+           hasattr(value, "__call__"):
+            value()
