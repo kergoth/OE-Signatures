@@ -4,7 +4,6 @@
 #   Shell:
 #   - Convert to a Value subclass
 #   Python:
-#   - Handle 'data.getVar'
 #   - Think about checking imports to exclude more direct func calls
 #   - Capture FunctionDef's to exclude them from the direct func calls list
 #     - NOTE: This will be inaccurate, since it won't be accounting for
@@ -178,34 +177,45 @@ def test():
     d.getVar('bar', False)
     test2()
 
+def a():
+    return "heh"
+
 bb.data.expand(bb.data.getVar("something", False, d), d)
 bb.data.expand("${inexpand} somethingelse", d)
-bb.data.getVar(foo, d, False)
+bb.data.getVar(a(), d, False)
 """
 
 def test_python():
     class Visit(ast.NodeVisitor):
+        getvars = ("d.getVar", "bb.data.getVar", "data.getVar")
+        expands = ("d.expand", "bb.data.expand", "data.expand")
+
         def __init__(self):
             self.var_references = set()
             self.direct_func_calls = set()
 
+        def warn(self, func, arg):
+            import codegen
+            print("Warning: in call to '%s', argument '%s' is not a literal string, unable to track reference" %
+                  (codegen.to_source(func), codegen.to_source(arg)))
+
         def visit_Call(self, node):
             ast.NodeVisitor.generic_visit(self, node)
-            if compare_name(("d.getVar", "bb.data.getVar"), node.func):
+            if compare_name(self.getvars, node.func):
                 if isinstance(node.args[0], ast.Str):
                     self.var_references.add(node.args[0].s)
                 else:
-                    print("Warning: call to getVar() with a non-literal-string first argument, unable to track variable reference.")
-            elif compare_name(("d.expand", "bb.data.expand"), node.func):
+                    self.warn(node.func, node.args[0])
+            elif compare_name(self.expands, node.func):
                 if isinstance(node.args[0], ast.Str):
                     value = oe.kergoth.Value(node.args[0].s, bb.data.init())
                     for var in value.references():
                         self.var_references.add(var)
                 elif isinstance(node.args[0], ast.Call) and \
-                     compare_name(("d.getVar", "bb.data.getVar"), node.args[0].func):
+                     compare_name(self.getvars, node.args[0].func):
                     pass
                 else:
-                    print("Warning: call to expand() with a non-literal-string first argument, unable to track variable reference.")
+                    self.warn(node.func, node.args[0])
             elif isinstance(node.func, ast.Name):
                 self.direct_func_calls.add(node.func.id)
 
@@ -213,7 +223,7 @@ def test_python():
     visitor = Visit()
     visitor.visit(code)
     assert(visitor.var_references == set(["bar", "somevar", "something", "inexpand"]))
-    assert(visitor.direct_func_calls == set(["test2"]))
+    assert(visitor.direct_func_calls == set(["test2", "a"]))
 
 
 if __name__ == "__main__":
