@@ -1,4 +1,19 @@
 #!/usr/bin/env python
+#
+# TODO:
+#   Shell:
+#   - Convert to a Value subclass
+#   Python:
+#   - Handle 'data.getVar'
+#   - Think about checking imports to exclude more direct func calls
+#   - Capture FunctionDef's to exclude them from the direct func calls list
+#     - NOTE: This will be inaccurate, since it won't be accounting for
+#             contexts initially.
+#   - Convert to a Value subclass
+#   - The current PythonValue class is more like VariableRef than a value, so
+#     either change its superclass or at least rename it to make this more
+#     clear, and to avoid confusion with the python function/task class.
+
 import sys
 import os
 import ast
