@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 import sys
 import os
+import ast
+
 
 basedir = os.path.dirname(sys.argv[0])
 searchpath = [os.path.join(basedir, "bitbake", "lib"),
@@ -10,6 +12,7 @@ sys.path[0:0] = searchpath
 import bb.data
 import oe.kergoth
 from pysh import pyshyacc, pyshlex, interp
+
 
 def process_words(words):
     for word in list(words):
@@ -45,6 +48,9 @@ def process(tokens):
         (name, value) = token
         if name == "simple_command":
             process_words(value.words)
+        elif name == "for_clause":
+            process_words(value.items)
+            process(value.cmds)
         elif name == "pipeline":
             process(value.commands)
         elif name == "if_clause":
@@ -52,14 +58,11 @@ def process(tokens):
             process(value.else_cmds)
         elif name == "and_or":
             process((value.left, value.right))
-        elif name == "for_clause":
-            process_words(value.items)
-            process(value.cmds)
         elif name == "while_clause":
             process(value.condition)
             process(value.cmds)
         elif name == "function_definition":
-            excluded.add(value.name)
+            funcdefs.add(value.name)
             process((value.body,))
         elif name == "brace_group":
             process(value.cmds)
@@ -71,6 +74,62 @@ def process(tokens):
             process((value.cmd,))
         else:
             raise NotImplementedError("Unsupported token type " + name)
+
+
+def _compare_name(strparts, node):
+    if not strparts:
+        return True
+
+    current, rest = strparts[0], strparts[1:]
+    if isinstance(node, ast.Attribute):
+        if current == node.attr:
+            return _compare_name(rest, node.value)
+    elif isinstance(node, ast.Name):
+        if current == node.id:
+            return True
+    #else:
+    #    return True
+    return False
+
+def compare_name(strval, node):
+    return _compare_name(tuple(reversed(strval.split("."))), node)
+
+pydata = """
+bb.data.getVar('somevar', d, True)
+def test():
+    foo = 'bar %s' % 'foo'
+    def test2():
+        d.getVar(foo, True)
+    d.getVar('bar', False)
+    test2()
+
+bb.data.expand(bb.data.getVar("something", False, d), d)
+bb.data.expand("${inexpand} somethingelse", d)
+bb.data.getVar(foo, d, False)
+"""
+
+def test_python():
+    class Visit(ast.NodeVisitor):
+        def __init__(self):
+            self.var_references = set()
+            self.direct_func_calls = set()
+
+        def visit_Call(self, node):
+            ast.NodeVisitor.generic_visit(self, node)
+            if compare_name("d.getVar", node.func) or \
+               compare_name("bb.data.getVar", node.func):
+               if node.args and \
+                  isinstance(node.args[0], ast.Str):
+                self.var_references.add(node.args[0].s)
+            elif isinstance(node.func, ast.Name):
+                self.direct_func_calls.add(node.func.id)
+
+    code = compile(pydata, "<string>", "exec", ast.PyCF_ONLY_AST)
+    visitor = Visit()
+    visitor.visit(code)
+    assert(visitor.var_references == set(["bar", "somevar", "something"]))
+    assert(visitor.direct_func_calls == set(["test2"]))
+
 
 shelldata = """
     foo () {
@@ -86,17 +145,19 @@ shelldata = """
     (
         true && false
         test -f foo
+        testval=something
+        $testval
     ) || aiee
     ! inverted
 """
+
 if __name__ == "__main__":
     tokens, script = pyshyacc.parse(shelldata, True, False)
     cmdnames = set()
-    excluded = set()
+    funcdefs = set()
     for token in tokens:
         process(token)
-    cmds = set(cmd for cmd in cmdnames if cmd not in excluded)
-    print(cmds)
+    cmds = set(cmd for cmd in cmdnames if cmd not in funcdefs)
     assert(cmds == set(["bar", "echo", "heh", "moo", "test", "aiee", "true",
                         "false", "inverted"]))
 
@@ -124,3 +185,5 @@ if __name__ == "__main__":
     val = oe.kergoth.Value("${@'boo ' + '${foo}'}", d)
     assert(str(val) == "boo value of foo")
     assert(list(val.references()) == ["foo"])
+
+    test_python()
