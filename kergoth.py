@@ -3,6 +3,9 @@
 # TODO:
 #   - Sanitize the property names amongst the Value implementations
 #   - Should the 'references' method become a property?
+#   - Rename 'references', as it is specifically references to variables in
+#     the metadata.  This isn't the only type of reference we have anymore, as
+#     we'll also be tracking calls to the methods in the methodpool.
 #   - Fix the PythonSnippet implementation to actually be a PythonValue
 #     subclass, as it needs 1) regular var ref tracking, 2) python value
 #     checking, and 3) execution of the python code at str() time.  1) and 2)
