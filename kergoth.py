@@ -22,6 +22,12 @@
 #   - Capture FunctionDef's to exclude them from the direct func calls list
 #     - NOTE: This will be inaccurate, since it won't be accounting for
 #             contexts initially.
+#
+#   NOTE: We should be able to utilize this way of expanding variables to let
+#   us change things like 'FOO += "bar"' internally into the creation of a new
+#   Value whose components are [FOO_old_Value_object, separator, "bar"].  This
+#   will be a start to allowing us to retain information about what variables
+#   were defined where through the parsing and expansion processes.
 
 import re
 import codegen
