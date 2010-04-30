@@ -18,12 +18,6 @@
 #   - Capture FunctionDef's to exclude them from the direct func calls list
 #     - NOTE: This will be inaccurate, since it won't be accounting for
 #             contexts initially.
-#
-#   NOTE: We should be able to utilize this way of expanding variables to let
-#   us change things like 'FOO += "bar"' internally into the creation of a new
-#   Value whose components are [FOO_old_Value_object, separator, "bar"].  This
-#   will be a start to allowing us to retain information about what variables
-#   were defined where through the parsing and expansion processes.
 
 import re
 import codegen
@@ -71,25 +65,6 @@ class VariableRef(object):
         return str(var)
 
 
-class PythonSnippet(object):
-    """Lazy evaluation of a python snippet in the form of a Components object"""
-
-    def __init__(self, components, metadata):
-        self.components = components
-        self.metadata = metadata
-
-    def __str__(self):
-        code = str(self.components)
-        codeobj = compile(code.strip(), "<expansion>", "eval")
-        try:
-            value = str(bb.utils.better_eval(codeobj, {"d": self.metadata}))
-        except Exception, exc:
-            bb.msg.note(1, bb.msg.domain.Data,
-                        "%s:%s while evaluating:\n%s" % (type(exc), exc,
-                                                         code))
-            return "<invalid>"
-        return str(Value(value, self.metadata))
-
 class Value(object):
     """Parse a value from the OE metadata into a Components object, held
     internally.  Running str() on this is equivalent to doing the same to its
@@ -98,9 +73,13 @@ class Value(object):
     var_re = re.compile(r"(\$\{|\})")
 
     def __init__(self, value, metadata):
-        self.value = value
+        if not isinstance(value, basestring):
+            self.components = Components(value)
+            self.value = None
+        else:
+            self.value = value
+            self.components = Components()
         self.metadata = metadata
-        self.components = Components()
         self.parse()
 
     def __repr__(self):
@@ -256,9 +235,7 @@ class ShellValue(Value):
             if word[0] in ("cmd_name", "cmd_word"):
                 cmd = word[1]
                 if cmd.startswith("$"):
-                    print("Warning: ignoring execution of %s "
-                          "as it appears to be a shell variable expansion" %
-                          word[1])
+                    print("Warning: execution of non-literal command '%s'" % word[1])
                 elif cmd == "eval":
                     command = " ".join(word for _, word in words[1:])
                     self.parse_shell(command)
@@ -381,13 +358,6 @@ class PythonValue(Value):
 
 class PythonSnippet(PythonValue):
     """Lazy evaluation of a python snippet"""
-
-    def __init__(self, components, metadata):
-        self.value = None
-        self.components = components
-        self.metadata = metadata
-        self.visitor = self.ValueVisitor()
-        self.parse()
 
     def __str__(self):
         code = str(self.components)

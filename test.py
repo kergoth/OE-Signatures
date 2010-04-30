@@ -42,6 +42,10 @@ def test_var_expansion():
     assert(str(val) == "value of foo value of bar")
     assert(set(val.references()) == set(["foo", "bar"]))
 
+    val = oe.kergoth.Value(oe.kergoth.Components([val, " test"]), d)
+    assert(str(val) == "value of foo value of bar test")
+    assert(set(val.references()) == set(["foo", "bar"]))
+
 
 shelldata = """
     foo () {
