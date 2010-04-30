@@ -1,12 +1,32 @@
 """Staging area for OE python bits for kergoth"""
 
+# TODO:
+#   - Sanitize the property names amongst the Value implementations
+#   - Should the 'references' method become a property?
+#   - Fix the PythonSnippet implementation to actually be a PythonValue
+#     subclass, as it needs 1) regular var ref tracking, 2) python value
+#     checking, and 3) execution of the python code at str() time.  1) and 2)
+#     are already done by PythonValue.
+#
+#   Python:
+#   - Move the direct function call list from the visitor into the main object
+#     after parsing, so the caller doesn't need to poke into the visitor
+#     directly.
+#   - Think about checking imports to exclude more direct func calls
+#   - Capture FunctionDef's to exclude them from the direct func calls list
+#     - NOTE: This will be inaccurate, since it won't be accounting for
+#             contexts initially.
+
 import re
 import shlex
+import codegen
+import ast
 from pysh import pyshyacc, pyshlex
 from StringIO import StringIO
 from collections import deque
 import bb.msg
 import bb.utils
+
 
 class Components(list):
     """A list of components, which concatenates itself upon str(), and runs
@@ -133,6 +153,7 @@ class Value(object):
                 result.append(token)
         self.components = result
 
+
 class ShellValue(Value):
     def __init__(self, value, metadata):
         self.shell_funcs = set()
@@ -217,3 +238,76 @@ class ShellValue(Value):
         for func in self.shell_external_execs:
             if self.metadata.getVar(func, False) is not None:
                 yield func
+
+
+class PythonValue(Value):
+    class ValueVisitor(ast.NodeVisitor):
+        getvars = ("d.getVar", "bb.data.getVar", "data.getVar")
+        expands = ("d.expand", "bb.data.expand", "data.expand")
+
+        @classmethod
+        def _compare_name(cls, strparts, node):
+            if not strparts:
+                return True
+
+            current, rest = strparts[0], strparts[1:]
+            if isinstance(node, ast.Attribute):
+                if current == node.attr:
+                    return cls._compare_name(rest, node.value)
+            elif isinstance(node, ast.Name):
+                if current == node.id:
+                    return True
+            return False
+
+        @classmethod
+        def compare_name(cls, value, node):
+            if isinstance(value, basestring):
+                return cls._compare_name(tuple(reversed(value.split("."))), node)
+            else:
+                return any(cls.compare_name(item, node) for item in value)
+
+        def __init__(self):
+            self.var_references = set()
+            self.direct_func_calls = set()
+
+        def warn(self, func, arg):
+            print("Warning: in call to '%s', argument '%s' is not a literal string, unable to track reference" %
+                  (codegen.to_source(func), codegen.to_source(arg)))
+
+        def visit_Call(self, node):
+            ast.NodeVisitor.generic_visit(self, node)
+            if self.compare_name(self.getvars, node.func):
+                if isinstance(node.args[0], ast.Str):
+                    self.var_references.add(node.args[0].s)
+                else:
+                    self.warn(node.func, node.args[0])
+            elif self.compare_name(self.expands, node.func):
+                if isinstance(node.args[0], ast.Str):
+                    value = Value(node.args[0].s, bb.data.init())
+                    for var in value.references():
+                        self.var_references.add(var)
+                elif isinstance(node.args[0], ast.Call) and \
+                     self.compare_name(self.getvars, node.args[0].func):
+                    pass
+                else:
+                    self.warn(node.func, node.args[0])
+            elif isinstance(node.func, ast.Name):
+                self.direct_func_calls.add(node.func.id)
+
+    def __init__(self, value, metadata):
+        self.visitor = self.ValueVisitor()
+        Value.__init__(self, value, metadata)
+
+    def parse(self):
+        Value.parse(self)
+        value = str(self.components)
+        code = compile(value, "<string>", "exec", ast.PyCF_ONLY_AST)
+        self.visitor.visit(code)
+
+    def references(self):
+        refs = Value.references(self)
+        for ref in refs:
+            yield ref
+
+        for ref in self.visitor.var_references:
+            yield ref
