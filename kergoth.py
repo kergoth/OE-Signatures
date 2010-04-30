@@ -1,6 +1,9 @@
 """Staging area for OE python bits for kergoth"""
 
 # TODO:
+#   - In the overridden references methods, use a uniq() utility function or a
+#     set to drop duplicates between the superclass references and the extra
+#     references gathered by the class.
 #   - Sanitize the property names amongst the Value implementations
 #   - Should the 'references' method become a property?
 #   - Rename 'references', as it is specifically references to variables in
@@ -21,12 +24,11 @@
 #             contexts initially.
 
 import re
-import shlex
 import codegen
 import ast
-from pysh import pyshyacc, pyshlex
-from StringIO import StringIO
+from itertools import chain
 from collections import deque
+from pysh import pyshyacc, pyshlex
 import bb.msg
 import bb.utils
 
@@ -101,13 +103,18 @@ class Value(object):
         self.parse()
 
     def __repr__(self):
-        return "%s(%s, %s)" % (self.__class__.__name__, repr(self.value), repr(self.metadata))
+        return "%s(%s, %s)" % (self.__class__.__name__, repr(self.value),
+                               repr(self.metadata))
 
     def __str__(self):
         return str(self.components)
 
     def references(self):
+        """Return an iterable of the variables this Value references"""
+
         def search(value, want):
+            """Search a tree of values which meet a condition"""
+
             for item in value.components:
                 if want(item):
                     yield item
@@ -158,6 +165,12 @@ class Value(object):
 
 
 class ShellValue(Value):
+    """Represents a block of shell code, initialized from a string.  First
+    parses the string into a components object to gather information about
+    regular variable references, then parses the resulting expanded shell code
+    to extract calls to other shell functions in the metadata.
+    """
+
     def __init__(self, value, metadata):
         self.shell_funcs = set()
         self.shell_execs = set()
@@ -169,45 +182,59 @@ class ShellValue(Value):
         self.shell_external_execs = self.parse_shell(str(self.components))
 
     def parse_shell(self, value):
-        tokens, script = pyshyacc.parse(value, True, False)
+        """Parse the supplied shell code in a string, returning the external
+        commands it executes.
+        """
+
+        tokens, _ = pyshyacc.parse(value, True, False)
         for token in tokens:
             self.process_tokens(token)
-        cmds = set(cmd for cmd in self.shell_execs if cmd not in self.shell_funcs)
+        cmds = set(cmd for cmd in self.shell_execs
+                       if cmd not in self.shell_funcs)
         return cmds
 
     def process_tokens(self, tokens):
+        """Process a supplied portion of the syntax tree as returned by
+        pyshyacc.parse.
+        """
+
+        def function_definition(value):
+            self.shell_funcs.add(value.name)
+            return ([value.body], None)
+
+        token_handlers = {
+          "simple_command": lambda x: (None, x.words),
+          "for_clause": lambda x: (x.cmds, x.items),
+          "pipeline": lambda x: (x.commands, None),
+          "if_clause": lambda x: (chain(x.if_cmds, x.else_cmds), None),
+          "and_or": lambda x: ((x.left, x.right), None),
+          "while_clause": lambda x: (chain(x.condition, x.cmds), None),
+          "function_definition": function_definition,
+          "brace_group": lambda x: (x.cmds, None),
+          "subshell": lambda x: (x.cmds, None),
+          "async": lambda x: ([x], None),
+          "redirect_list": lambda x: ([x.cmd], None),
+        }
+
         for token in tokens:
-            (name, value) = token
-            if name == "simple_command":
-                self.process_words(value.words)
-            elif name == "for_clause":
-                self.process_words(value.items)
-                self.process_tokens(value.cmds)
-            elif name == "pipeline":
-                self.process_tokens(value.commands)
-            elif name == "if_clause":
-                self.process_tokens(value.if_cmds)
-                self.process_tokens(value.else_cmds)
-            elif name == "and_or":
-                self.process_tokens((value.left, value.right))
-            elif name == "while_clause":
-                self.process_tokens(value.condition)
-                self.process_tokens(value.cmds)
-            elif name == "function_definition":
-                self.shell_funcs.add(value.name)
-                self.process_tokens((value.body,))
-            elif name == "brace_group":
-                self.process_tokens(value.cmds)
-            elif name == "subshell":
-                self.process_tokens(value.cmds)
-            elif name == "async":
-                self.process_tokens((value,))
-            elif name == "redirect_list":
-                self.process_tokens((value.cmd,))
-            else:
+            name, value = token
+            try:
+                more_tokens, words = token_handlers[name](value)
+            except KeyError:
                 raise NotImplementedError("Unsupported token type " + name)
 
+            if more_tokens:
+                self.process_tokens(more_tokens)
+
+            if words:
+                self.process_words(words)
+
     def process_words(self, words):
+        """Process a set of 'words' in pyshyacc parlance, which includes
+        extraction of executed commands from $() blocks, as well as grabbing
+        the command name argument.
+        """
+
         for word in list(words):
             wtree = pyshlex.make_wordtree(word[1])
             for part in wtree:
@@ -226,7 +253,9 @@ class ShellValue(Value):
             if word[0] in ("cmd_name", "cmd_word"):
                 cmd = word[1]
                 if cmd.startswith("$"):
-                    print("Warning: ignoring execution of %s as it appears to be a shell variable expansion" % word[1])
+                    print("Warning: ignoring execution of %s "
+                          "as it appears to be a shell variable expansion" %
+                          word[1])
                 elif cmd == "eval":
                     command = " ".join(word for _, word in words[1:])
                     self.parse_shell(command)
@@ -244,12 +273,30 @@ class ShellValue(Value):
 
 
 class PythonValue(Value):
+    """Represents a block of python code, initialized from a string.  First
+    determines the variables referenced via normal variable expansion, then
+    traverses the python syntax tree to extract variables references accessed
+    via the usual bitbake metadata APIs, as well as the external functions
+    called (to track usage of functions in the methodpool).
+    """
+
     class ValueVisitor(ast.NodeVisitor):
+        """Visitor to traverse a python abstract syntax tree and obtain
+        the variables referenced via bitbake metadata APIs, and the external
+        functions called.
+        """
+
         getvars = ("d.getVar", "bb.data.getVar", "data.getVar")
         expands = ("d.expand", "bb.data.expand", "data.expand")
 
         @classmethod
         def _compare_name(cls, strparts, node):
+            """Given a sequence of strings representing a python name,
+            where the last component is the actual Name and the prior
+            elements are Attribute nodes, determine if the supplied node
+            matches.
+            """
+
             if not strparts:
                 return True
 
@@ -264,17 +311,31 @@ class PythonValue(Value):
 
         @classmethod
         def compare_name(cls, value, node):
+            """Convenience function for the _compare_node method, which
+            can accept a string (which is split by '.' for you), or an
+            iterable of strings, in which case it checks to see if any of
+            them match, similar to isinstance.
+            """
+
             if isinstance(value, basestring):
-                return cls._compare_name(tuple(reversed(value.split("."))), node)
+                return cls._compare_name(tuple(reversed(value.split("."))),
+                                         node)
             else:
                 return any(cls.compare_name(item, node) for item in value)
 
         def __init__(self):
             self.var_references = set()
             self.direct_func_calls = set()
+            ast.NodeVisitor.__init__(self)
 
-        def warn(self, func, arg):
-            print("Warning: in call to '%s', argument '%s' is not a literal string, unable to track reference" %
+        @classmethod
+        def warn(cls, func, arg):
+            """Warn about calls of bitbake APIs which pass a non-literal
+            argument for the variable name, as we're not able to track such
+            a reference.
+            """
+
+            print("Warning: in call to '%s', argument '%s' is not a literal" %
                   (codegen.to_source(func), codegen.to_source(arg)))
 
         def visit_Call(self, node):
