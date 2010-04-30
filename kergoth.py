@@ -9,10 +9,6 @@
 #   - Rename 'references', as it is specifically references to variables in
 #     the metadata.  This isn't the only type of reference we have anymore, as
 #     we'll also be tracking calls to the methods in the methodpool.
-#   - Fix the PythonSnippet implementation to actually be a PythonValue
-#     subclass, as it needs 1) regular var ref tracking, 2) python value
-#     checking, and 3) execution of the python code at str() time.  1) and 2)
-#     are already done by PythonValue.
 #
 #   Python:
 #   - Move the direct function call list from the visitor into the main object
@@ -94,7 +90,6 @@ class PythonSnippet(object):
             return "<invalid>"
         return str(Value(value, self.metadata))
 
-
 class Value(object):
     """Parse a value from the OE metadata into a Components object, held
     internally.  Running str() on this is equivalent to doing the same to its
@@ -118,23 +113,25 @@ class Value(object):
     def references(self):
         """Return an iterable of the variables this Value references"""
 
-        def search(value, want):
-            """Search a tree of values which meet a condition"""
-
+        def search(value):
             for item in value.components:
-                if want(item):
-                    yield item
+                if isinstance(item, VariableRef) and \
+                   all(isinstance(x, basestring) for x in item.components):
+                    yield str(item.components)
 
-                if hasattr(item, "components"):
-                    for otheritem in search(item, want):
+                if hasattr(item, "references"):
+                    for ref in item.references():
+                        yield ref
+                elif hasattr(item, "components"):
+                    for otheritem in search(item):
                         yield otheritem
-
-        for ref in search(self, lambda x: isinstance(x, VariableRef)):
-            if all(isinstance(x, basestring) for x in ref.components):
-                yield str(ref.components)
+        return search(self)
 
     def parse(self):
         """Parse a value from the OE metadata into a Components object"""
+
+        if self.value is None:
+            return
 
         if not isinstance(self.value, basestring) or \
            "${" not in self.value:
@@ -381,3 +378,25 @@ class PythonValue(Value):
 
         for ref in self.visitor.var_references:
             yield ref
+
+class PythonSnippet(PythonValue):
+    """Lazy evaluation of a python snippet"""
+
+    def __init__(self, components, metadata):
+        self.value = None
+        self.components = components
+        self.metadata = metadata
+        self.visitor = self.ValueVisitor()
+        self.parse()
+
+    def __str__(self):
+        code = str(self.components)
+        codeobj = compile(code.strip(), "<expansion>", "eval")
+        try:
+            value = str(bb.utils.better_eval(codeobj, {"d": self.metadata}))
+        except Exception, exc:
+            bb.msg.note(1, bb.msg.domain.Data,
+                        "%s:%s while evaluating:\n%s" % (type(exc), exc,
+                                                         code))
+            return "<invalid>"
+        return str(Value(value, self.metadata))
