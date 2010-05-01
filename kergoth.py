@@ -9,6 +9,9 @@
 #   - Rename 'references', as it is specifically references to variables in
 #     the metadata.  This isn't the only type of reference we have anymore, as
 #     we'll also be tracking calls to the methods in the methodpool.
+#   - Add memoization of __str__, ideally indexed by the bits that feed into
+#     the resulting string (i.e. self.components).
+#   - Clean up the exception handling and bb.msg output
 #
 #   Python:
 #   - Move the direct function call list from the visitor into the main object
@@ -24,7 +27,8 @@ import codegen
 import ast
 from itertools import chain
 from collections import deque
-from pysh import pyshyacc, pyshlex
+from pysh import pyshyacc, pyshlex, sherrors
+from textwrap import dedent
 import bb.msg
 import bb.utils
 
@@ -57,11 +61,7 @@ class VariableRef(object):
         if variables and name in variables:
             var = variables[name]
         else:
-            value = self.metadata.getVar(name, False)
-            if value is None:
-                return "${%s}" % name
-
-            var = Value(value, self.metadata)
+            var = value(name, self.metadata)
         return str(var)
 
 
@@ -168,7 +168,12 @@ class ShellValue(Value):
         commands it executes.
         """
 
-        tokens, _ = pyshyacc.parse(value, True, False)
+        try:
+            tokens, _ = pyshyacc.parse(value, True, False)
+        except sherrors.ShellSyntaxError, exc:
+            bb.msg.note(1, None, "Shell syntax error when parsing, skipping shell var ref tracking")
+            return ()
+
         for token in tokens:
             self.process_tokens(token)
         cmds = set(cmd for cmd in self.shell_execs
@@ -235,7 +240,7 @@ class ShellValue(Value):
             if word[0] in ("cmd_name", "cmd_word"):
                 cmd = word[1]
                 if cmd.startswith("$"):
-                    print("Warning: execution of non-literal command '%s'" % word[1])
+                    bb.msg.debug(1, None, "Warning: execution of non-literal command '%s'" % word[1])
                 elif cmd == "eval":
                     command = " ".join(word for _, word in words[1:])
                     self.parse_shell(command)
@@ -315,8 +320,22 @@ class PythonValue(Value):
             a reference.
             """
 
-            print("Warning: in call to '%s', argument '%s' is not a literal" %
-                  (codegen.to_source(func), codegen.to_source(arg)))
+            try:
+                funcstr = codegen.to_source(func)
+            except Exception, exc:
+                bb.msg.debug(1, None, "codegen failed to convert %s to a string" %
+                                     ast.dump(func))
+                return
+
+            try:
+                argstr = codegen.to_source(arg)
+            except Exception, exc:
+                bb.msg.debug(1, None, "codegen failed to convert %s to a string" %
+                                      ast.dump(arg))
+                return
+
+            bb.msg.debug(1, None, "Warning: in call to '%s', argument '%s' is not a literal" %
+                                 (funcstr, argstr))
 
         def visit_Call(self, node):
             ast.NodeVisitor.generic_visit(self, node)
@@ -345,8 +364,14 @@ class PythonValue(Value):
     def parse(self):
         Value.parse(self)
         value = str(self.components)
-        code = compile(value, "<string>", "exec", ast.PyCF_ONLY_AST)
-        self.visitor.visit(code)
+        try:
+            code = compile(value, "<string>", "exec", ast.PyCF_ONLY_AST)
+        except Exception, exc:
+            import traceback
+            bb.msg.note(1, None, "Failed to compile %s" % value)
+            bb.msg.note(1, None, str(traceback.format_exc(exc)))
+        else:
+            self.visitor.visit(code)
 
     def references(self):
         refs = Value.references(self)
@@ -370,3 +395,50 @@ class PythonSnippet(PythonValue):
                                                          code))
             return "<invalid>"
         return str(Value(value, self.metadata))
+
+
+from tokenize import generate_tokens, untokenize, INDENT, DEDENT, COMMENT
+from StringIO import StringIO
+
+def dedent_python(s):
+    indent = None
+    level = 0
+    tokens = []
+    for toknum, tokval, _, _, _ in generate_tokens(StringIO(s).readline):
+        if toknum == INDENT:
+            level += 1
+            if level == 1:
+                indent = tokval
+                continue
+            elif indent:
+                tokval = tokval[len(indent):]
+        elif toknum == DEDENT:
+            level -= 1
+            if level == 0:
+                indent = None
+                continue
+        tokens.append((toknum, tokval))
+    return untokenize(tokens)
+
+def value(variable, metadata):
+    """Value creation factory for a variable in the metadata"""
+
+    val = metadata.getVar(variable, False)
+    if val is None:
+        return
+
+    if metadata.getVarFlag(variable, "func"):
+        if metadata.getVarFlag(variable, "python"):
+            try:
+                s = dedent_python(val.expandtabs())
+            except Exception, exc:
+                from traceback import format_exc
+                bb.msg.note(1, None, "Failed to dedent %s:" % variable)
+                bb.msg.note(1, None, val)
+                bb.msg.note(1, None, str(format_exc(exc)))
+                s = val
+            return PythonValue(s, metadata)
+        else:
+            return ShellValue(val, metadata)
+    else:
+        return Value(val, metadata)

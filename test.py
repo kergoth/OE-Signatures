@@ -79,25 +79,31 @@ def test_shell():
 
 
 pydata = """
-bb.data.getVar('somevar', d, True)
-def test():
-    foo = 'bar %s' % 'foo'
-    def test2():
-        d.getVar(foo, True)
-    d.getVar('bar', False)
-    test2()
+    bb.data.getVar('somevar', d, True)
+    def test():
+        foo = 'bar %s' % 'foo'
+        def test2():
+            d.getVar(foo, True)
+        d.getVar('bar', False)
+        test2()
 
-def a():
-    return "heh"
+    def a():
+        \"\"\"some
+stuff
+        \"\"\"
+        return "heh"
 
-bb.data.expand(bb.data.getVar("something", False, d), d)
-bb.data.expand("${inexpand} somethingelse", d)
-bb.data.getVar(a(), d, False)
+    bb.data.expand(bb.data.getVar("something", False, d), d)
+    bb.data.expand("${inexpand} somethingelse", d)
+    bb.data.getVar(a(), d, False)
 """
 
 def test_python():
     d = bb.data.init()
-    value = oe.kergoth.PythonValue(pydata, d)
+    d.setVar("somevar", pydata)
+    d.setVarFlag("somevar", "func", True)
+    d.setVarFlag("somevar", "python", True)
+    value = oe.kergoth.value("somevar", d)
     assert(set(value.references()) == set(["somevar", "bar", "something", "inexpand"]))
     assert(value.visitor.direct_func_calls == set(["test2", "a"]))
 
