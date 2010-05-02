@@ -28,7 +28,6 @@ import ast
 from itertools import chain
 from collections import deque
 from pysh import pyshyacc, pyshlex, sherrors
-from textwrap import dedent
 import bb.msg
 import bb.utils
 
@@ -72,12 +71,12 @@ class Value(object):
 
     var_re = re.compile(r"(\$\{|\})")
 
-    def __init__(self, value, metadata):
-        if not isinstance(value, basestring):
-            self.components = Components(value)
+    def __init__(self, val, metadata):
+        if not isinstance(val, basestring):
+            self.components = Components(val)
             self.value = None
         else:
-            self.value = value
+            self.value = val
             self.components = Components()
         self.metadata = metadata
         self.parse()
@@ -92,8 +91,8 @@ class Value(object):
     def references(self):
         """Return an iterable of the variables this Value references"""
 
-        def search(value):
-            for item in value.components:
+        def search(val):
+            for item in val.components:
                 if isinstance(item, VariableRef) and \
                    all(isinstance(x, basestring) for x in item.components):
                     yield str(item.components)
@@ -130,15 +129,15 @@ class Value(object):
                     if hasattr(current[0], "startswith") and \
                        current[0].startswith("@"):
                         current[0] = current[0][1:]
-                        value = PythonSnippet(current, self.metadata)
+                        val = PythonSnippet(current, self.metadata)
                     else:
-                        value = VariableRef(current, self.metadata)
+                        val = VariableRef(current, self.metadata)
 
                     current = stack.pop()
                     if current is None:
-                        result.append(value)
+                        result.append(val)
                     else:
-                        current.append(value)
+                        current.append(val)
                 else:
                     current.append(token)
             else:
@@ -153,25 +152,25 @@ class ShellValue(Value):
     to extract calls to other shell functions in the metadata.
     """
 
-    def __init__(self, value, metadata):
+    def __init__(self, val, metadata):
         self.shell_funcs = set()
         self.shell_execs = set()
         self.shell_external_execs = set()
-        Value.__init__(self, value, metadata)
+        val.__init__(self, val, metadata)
 
     def parse(self):
         Value.parse(self)
         self.shell_external_execs = self.parse_shell(str(self.components))
 
-    def parse_shell(self, value):
+    def parse_shell(self, val):
         """Parse the supplied shell code in a string, returning the external
         commands it executes.
         """
 
         try:
-            tokens, _ = pyshyacc.parse(value, True, False)
-        except sherrors.ShellSyntaxError, exc:
-            bb.msg.note(1, None, "Shell syntax error when parsing, skipping shell var ref tracking")
+            tokens, _ = pyshyacc.parse(val, True, False)
+        except sherrors.ShellSyntaxError:
+            bb.msg.note(1, None, "Shell syntax error when parsing:\n%s" % val)
             return ()
 
         for token in tokens:
@@ -185,9 +184,9 @@ class ShellValue(Value):
         pyshyacc.parse.
         """
 
-        def function_definition(value):
-            self.shell_funcs.add(value.name)
-            return ([value.body], None)
+        def function_definition(val):
+            self.shell_funcs.add(val.name)
+            return ([val.body], None)
 
         token_handlers = {
           "simple_command": lambda x: (None, x.words),
@@ -204,9 +203,9 @@ class ShellValue(Value):
         }
 
         for token in tokens:
-            name, value = token
+            name, val = token
             try:
-                more_tokens, words = token_handlers[name](value)
+                more_tokens, words = token_handlers[name](val)
             except KeyError:
                 raise NotImplementedError("Unsupported token type " + name)
 
@@ -295,18 +294,18 @@ class PythonValue(Value):
             return False
 
         @classmethod
-        def compare_name(cls, value, node):
+        def compare_name(cls, val, node):
             """Convenience function for the _compare_node method, which
             can accept a string (which is split by '.' for you), or an
             iterable of strings, in which case it checks to see if any of
             them match, similar to isinstance.
             """
 
-            if isinstance(value, basestring):
-                return cls._compare_name(tuple(reversed(value.split("."))),
+            if isinstance(val, basestring):
+                return cls._compare_name(tuple(reversed(val.split("."))),
                                          node)
             else:
-                return any(cls.compare_name(item, node) for item in value)
+                return any(cls.compare_name(item, node) for item in val)
 
         def __init__(self):
             self.var_references = set()
@@ -322,7 +321,7 @@ class PythonValue(Value):
 
             try:
                 funcstr = codegen.to_source(func)
-            except Exception, exc:
+            except Exception:
                 bb.msg.debug(1, None, "codegen failed to convert %s to a string" %
                                      ast.dump(func))
                 return
@@ -346,8 +345,8 @@ class PythonValue(Value):
                     self.warn(node.func, node.args[0])
             elif self.compare_name(self.expands, node.func):
                 if isinstance(node.args[0], ast.Str):
-                    value = Value(node.args[0].s, bb.data.init())
-                    for var in value.references():
+                    val = Value(node.args[0].s, bb.data.init())
+                    for var in val.references():
                         self.var_references.add(var)
                 elif isinstance(node.args[0], ast.Call) and \
                      self.compare_name(self.getvars, node.args[0].func):
@@ -357,18 +356,18 @@ class PythonValue(Value):
             elif isinstance(node.func, ast.Name):
                 self.direct_func_calls.add(node.func.id)
 
-    def __init__(self, value, metadata):
+    def __init__(self, val, metadata):
         self.visitor = self.ValueVisitor()
-        Value.__init__(self, value, metadata)
+        Value.__init__(self, val, metadata)
 
     def parse(self):
         Value.parse(self)
-        value = str(self.components)
+        val = str(self.components)
         try:
             code = compile(value, "<string>", "exec", ast.PyCF_ONLY_AST)
         except Exception, exc:
             import traceback
-            bb.msg.note(1, None, "Failed to compile %s" % value)
+            bb.msg.note(1, None, "Failed to compile %s" % val)
             bb.msg.note(1, None, str(traceback.format_exc(exc)))
         else:
             self.visitor.visit(code)
@@ -388,23 +387,26 @@ class PythonSnippet(PythonValue):
         code = str(self.components)
         codeobj = compile(code.strip(), "<expansion>", "eval")
         try:
-            value = str(bb.utils.better_eval(codeobj, {"d": self.metadata}))
+            val = str(bb.utils.better_eval(codeobj, {"d": self.metadata}))
         except Exception, exc:
             bb.msg.note(1, bb.msg.domain.Data,
                         "%s:%s while evaluating:\n%s" % (type(exc), exc,
                                                          code))
             return "<invalid>"
-        return str(Value(value, self.metadata))
+        return str(Value(val, self.metadata))
 
 
-from tokenize import generate_tokens, untokenize, INDENT, DEDENT, COMMENT
-from StringIO import StringIO
+from tokenize import generate_tokens, untokenize, INDENT, DEDENT
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from StringIO import StringIO
 
-def dedent_python(s):
+def dedent_python(codestr):
     indent = None
     level = 0
     tokens = []
-    for toknum, tokval, _, _, _ in generate_tokens(StringIO(s).readline):
+    for toknum, tokval, _, _, _ in generate_tokens(StringIO(codestr).readline):
         if toknum == INDENT:
             level += 1
             if level == 1:
@@ -430,14 +432,13 @@ def value(variable, metadata):
     if metadata.getVarFlag(variable, "func"):
         if metadata.getVarFlag(variable, "python"):
             try:
-                s = dedent_python(val.expandtabs())
+                val = dedent_python(val.expandtabs())
             except Exception, exc:
                 from traceback import format_exc
                 bb.msg.note(1, None, "Failed to dedent %s:" % variable)
                 bb.msg.note(1, None, val)
                 bb.msg.note(1, None, str(format_exc(exc)))
-                s = val
-            return PythonValue(s, metadata)
+            return PythonValue(val, metadata)
         else:
             return ShellValue(val, metadata)
     else:
