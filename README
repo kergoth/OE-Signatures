@@ -20,6 +20,39 @@ is a step in the right direction for that also, but this would allow us to
 bypass re-execution of the ast statements as well, simply letting 'dirty'
 state information flow through the variable references.
 
+Known Issues / Concerns:
+- No recursion checking yet.
+- It has to expand the shell and python code in order to scan it to extract
+  the variable reference information.  In some cases, this means the expansion
+  may be occurring sooner than it would normally expect to happen.  As an
+  example, a variable which runs a function in a ${@} snippet that reads from
+  a file in staging -- this will not be happy if expanded before the task is
+  actually to be run.  It may be that we'll want to avoid this sort of thing,
+  as it also causes problems with bitbake -e.
+- Currently it pays zero attention to flags, as flags generally instruct
+  bitbake in *how* to make something happen, not *what* will happen, for a
+  given task.
+- ShellValue
+  - The shell code which identifies defined functions and excludes them from the
+    list of executed commands does not take into account context.  If one
+    defined a function in a subshell, it would still exclude it from the list.
+  - Cannot currently determine what variable (if a variable) is being referenced
+    if it's a shell variable expansion.  As an example: 'for x in 1 2 3; eval $x;
+    done'
+- PythonValue:
+  - Cannot determine what variable is being referenced when the argument to the
+    getVar is passed something other than a literal string.  As an example,
+    '"RDEPENDS_" + pkg' bites us.
+  - Does not exclude locally imported functions from the list of executed
+    functions.  If you run 'from collections import defaultdict', and run
+    defaultdict, it will include defaultdict in the list of executed
+    functions.  We should check for those import statements.
+  - It captures a list of functions which are executed directly
+    (that is, they're names, not attributes), but does not exclude functions
+    which are actually defined in this same block of code.  We should try to do
+    so, though it will be difficult to be full proof without taking into account
+    contexts.
+
 TODO:
   - Add checking for recursion
   - Clean up the exception handling and bb.msg output
@@ -47,7 +80,3 @@ TODO:
       after parsing, so the caller doesn't need to poke into the visitor
       directly.
     - Think about checking imports to exclude more direct func calls
-    - Capture FunctionDef's to exclude them from the direct func calls list
-      - NOTE: This will be inaccurate, since it won't be accounting for
-              contexts initially.
-
