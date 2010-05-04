@@ -82,6 +82,17 @@ class Value(object):
         self.metadata = metadata
         self.parse()
 
+    def __eq__(self, other):
+        return isinstance(other, type(self)) and \
+               self.components == other.components and \
+               self.metadata == other.metadata
+
+    def __ne__(self, other):
+        return not self == other
+
+    def __hash__(self):
+        return hash((self.components, self.metadata))
+
     def __repr__(self):
         return "%s(%s, %s)" % (self.__class__.__name__, repr(self.value),
                                repr(self.metadata))
