@@ -469,8 +469,15 @@ def stable_repr(value):
     return "%s(%s)" % (value.__class__.__name__, args)
 
 def hash_vars(vars, d):
+    blacklist = d.getVar("BB_HASH_BLACKLIST")
+    if blacklist:
+        blacklist = blacklist.split()
+
     def is_blacklisted(val):
-        for bl in d.getVar("BB_HASH_BLACKLIST", True).split():
+        if not blacklist:
+            return
+
+        for bl in blacklist:
             if isinstance(val, Value):
                 if fnmatchcase(val.value, bl):
                     return val.value
