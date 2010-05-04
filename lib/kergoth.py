@@ -478,13 +478,74 @@ def stable_repr(val):
         return "%s(%s)" % (val.__class__.__name__, stable_repr(val.components))
     return repr(val)
 
-def hash_vars(vars, d):
-    blacklist = d.getVar("BB_HASH_BLACKLIST", True)
-    if blacklist:
-        blacklist = blacklist.split()
+class Signature(object):
+    def __init__(self, metadata, vars = None, blacklist = None):
+        self._md5 = None
+        self._data = None
+        self.metadata = metadata
 
-    def is_blacklisted(val):
-        if not blacklist:
+        if vars:
+            self.vars = vars
+        else:
+            self.vars = [var for var in self.metadata.keys()
+                         if metadata.getVarFlag(var, "task")]
+
+        if blacklist:
+            self.blacklist = blacklist
+        else:
+            blacklist = metadata.getVar("BB_HASH_BLACKLIST", True)
+            if blacklist:
+                self.blacklist = blacklist.split()
+            else:
+                self.blacklist = None
+
+    def __repr__(self):
+        return "Signature(%s, %s, %s)" % (self.metadata, self.vars, self.blacklist)
+
+    def __hash__(self):
+        return hash((self.metadata, self.vars, self.blacklist))
+
+    def __str__(self):
+        from base64 import urlsafe_b64encode
+
+        return urlsafe_b64encode(self.md5.digest()).rstrip("=")
+
+    def hash(self):
+        return int(self.md5.hexdigest(), 16)
+
+    @property
+    def md5(self):
+        value = self._md5
+        if value is None:
+            string = stable_repr(self.data)
+            value = self._md5 = hashlib.md5(string)
+        return value
+
+    @property
+    def data(self):
+        if self._data:
+            return self._data
+
+        def data_for_hash(var):
+            valstr = self.metadata.getVar(var, False)
+            if valstr is not None:
+                if not self.is_blacklisted(var):
+                    val = self.transform_blacklisted(value(var, self.metadata))
+
+                    yield var, val
+                    if hasattr(val, "references"):
+                        for ref in val.references():
+                            for other in data_for_hash(ref):
+                                yield other
+
+        if not self.vars:
+            self.vars = [var for var in self.metadata.keys()
+                         if self.metadata.getVarFlag(var, "task")]
+        data = self._data = dict(chain(*[data_for_hash(var) for var in self.vars]))
+        return data
+
+    def is_blacklisted(self, val):
+        if not self.blacklist:
             return
 
         for bl in blacklist:
@@ -505,18 +566,17 @@ def hash_vars(vars, d):
                 if fnmatchcase(val, bl):
                     return val
 
-    @Memoized
-    def transform_blacklisted(item):
-        if not blacklist:
+    def transform_blacklisted(self, item):
+        if not self.blacklist:
             return item
 
-        black = is_blacklisted(item)
-        if is_blacklisted(item):
+        black = self.is_blacklisted(item)
+        if black:
             return "${%s}" % black
         elif isinstance(item, Value):
             transformed = transform_blacklisted(item.components)
             if transformed != item.components:
-                return item.__class__(transformed, d)
+                return item.__class__(transformed, self.metadata)
         elif isinstance(item, Components):
             transformed = transform_blacklisted(tuple(item))
             if transformed != item:
@@ -524,30 +584,3 @@ def hash_vars(vars, d):
         elif isinstance(item, tuple):
             return (transform_blacklisted(i) for i in item)
         return item
-
-    def data_for_hash(var):
-        valstr = d.getVar(var, False)
-        if valstr is not None:
-            if not is_blacklisted(var):
-                val = transform_blacklisted(value(var, d))
-
-                yield var, val
-                if hasattr(val, "references"):
-                    for ref in val.references():
-                        for other in data_for_hash(ref):
-                            yield other
-
-    data = dict(chain(*[data_for_hash(var) for var in vars]))
-    string = stable_repr(data)
-    print("%s" % string)
-    return hashlib.md5(string).digest()
-
-def get_tasks(d):
-    for key in d.keys():
-        if d.getVarFlag(key, "task"):
-            yield key
-
-def recipe_signature(d):
-    from base64 import urlsafe_b64encode
-
-    return urlsafe_b64encode(hash_vars(get_tasks(d), d)).rstrip("=")

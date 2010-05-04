@@ -117,7 +117,7 @@ def test_signature():
     d.setVarFlags("beta", {"func": True, "task": True})
     d.setVar("theta", "alpha baz")
     d.setVarFlags("theta", {"func": True, "task": True})
-    print(kergoth.recipe_signature(d))
+    print(kergoth.Signature(d))
 
 import pickle
 def test_oedata():
@@ -136,7 +136,7 @@ def test_oedata():
         varflags = flags[key]
         if varflags:
             d.setVarFlags(key, flags[key])
-    print(kergoth.recipe_signature(d))
+    print(kergoth.Signature(d))
 
 if __name__ == "__main__":
     for name, value in globals().items():
