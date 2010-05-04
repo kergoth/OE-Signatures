@@ -1,33 +1,40 @@
 """Staging area for OE python bits for kergoth"""
 
 # TODO:
-#   - In the overridden references methods, use a uniq() utility function or a
-#     set to drop duplicates between the superclass references and the extra
-#     references gathered by the class.
-#   - Sanitize the property names amongst the Value implementations
-#   - Should the 'references' method become a property?
-#   - Rename 'references', as it is specifically references to variables in
-#     the metadata.  This isn't the only type of reference we have anymore, as
-#     we'll also be tracking calls to the methods in the methodpool.
-#   - Add memoization of __str__, ideally indexed by the bits that feed into
-#     the resulting string (i.e. self.components).
+#   - Add checking for recursion
 #   - Clean up the exception handling and bb.msg output
 #
-#   Python:
-#   - Move the direct function call list from the visitor into the main object
-#     after parsing, so the caller doesn't need to poke into the visitor
-#     directly.
-#   - Think about checking imports to exclude more direct func calls
-#   - Capture FunctionDef's to exclude them from the direct func calls list
-#     - NOTE: This will be inaccurate, since it won't be accounting for
-#             contexts initially.
+#   - Cleanup
+#     - In the overridden references methods, use a uniq() utility function or a
+#       set to drop duplicates between the superclass references and the extra
+#       references gathered by the class.
+#     - Sanitize the property names amongst the Value implementations
+#     - Should the 'references' method become a property?
+#     - Rename 'references', as it is specifically references to variables in
+#       the metadata.  This isn't the only type of reference we have anymore, as
+#       we'll also be tracking calls to the methods in the methodpool.
+#   - Performance
+#     - Add memoization of __str__, ideally indexed by the bits that feed into
+#       the resulting string (i.e. self.components).
+#
+#   - PythonValue:
+#     - Move the direct function call list from the visitor into the main object
+#       after parsing, so the caller doesn't need to poke into the visitor
+#       directly.
+#     - Think about checking imports to exclude more direct func calls
+#     - Capture FunctionDef's to exclude them from the direct func calls list
+#       - NOTE: This will be inaccurate, since it won't be accounting for
+#               contexts initially.
 
 import re
 import codegen
 import ast
+import hashlib
+from fnmatch import fnmatchcase
 from itertools import chain
 from collections import deque
 from pysh import pyshyacc, pyshlex, sherrors
+from textwrap import dedent
 import bb.msg
 import bb.utils
 
@@ -56,12 +63,7 @@ class VariableRef(object):
 
     def __str__(self):
         name = str(self.components)
-        variables = self.metadata.getVar("__variables", False)
-        if variables and name in variables:
-            var = variables[name]
-        else:
-            var = value(name, self.metadata)
-        return str(var)
+        return str(value(name, self.metadata))
 
 
 class Value(object):
@@ -71,12 +73,12 @@ class Value(object):
 
     var_re = re.compile(r"(\$\{|\})")
 
-    def __init__(self, val, metadata):
-        if not isinstance(val, basestring):
-            self.components = Components(val)
+    def __init__(self, value, metadata):
+        if not isinstance(value, basestring):
+            self.components = Components(value)
             self.value = None
         else:
-            self.value = val
+            self.value = value
             self.components = Components()
         self.metadata = metadata
         self.parse()
@@ -91,8 +93,8 @@ class Value(object):
     def references(self):
         """Return an iterable of the variables this Value references"""
 
-        def search(val):
-            for item in val.components:
+        def search(value):
+            for item in value.components:
                 if isinstance(item, VariableRef) and \
                    all(isinstance(x, basestring) for x in item.components):
                     yield str(item.components)
@@ -129,15 +131,15 @@ class Value(object):
                     if hasattr(current[0], "startswith") and \
                        current[0].startswith("@"):
                         current[0] = current[0][1:]
-                        val = PythonSnippet(current, self.metadata)
+                        value = PythonSnippet(current, self.metadata)
                     else:
-                        val = VariableRef(current, self.metadata)
+                        value = VariableRef(current, self.metadata)
 
                     current = stack.pop()
                     if current is None:
-                        result.append(val)
+                        result.append(value)
                     else:
-                        current.append(val)
+                        current.append(value)
                 else:
                     current.append(token)
             else:
@@ -152,25 +154,25 @@ class ShellValue(Value):
     to extract calls to other shell functions in the metadata.
     """
 
-    def __init__(self, val, metadata):
+    def __init__(self, value, metadata):
         self.shell_funcs = set()
         self.shell_execs = set()
         self.shell_external_execs = set()
-        val.__init__(self, val, metadata)
+        Value.__init__(self, value, metadata)
 
     def parse(self):
         Value.parse(self)
         self.shell_external_execs = self.parse_shell(str(self.components))
 
-    def parse_shell(self, val):
+    def parse_shell(self, value):
         """Parse the supplied shell code in a string, returning the external
         commands it executes.
         """
 
         try:
-            tokens, _ = pyshyacc.parse(val, True, False)
-        except sherrors.ShellSyntaxError:
-            bb.msg.note(1, None, "Shell syntax error when parsing:\n%s" % val)
+            tokens, _ = pyshyacc.parse(value, True, False)
+        except sherrors.ShellSyntaxError, exc:
+            bb.msg.note(1, None, "Shell syntax error when parsing, skipping shell var ref tracking")
             return ()
 
         for token in tokens:
@@ -184,9 +186,9 @@ class ShellValue(Value):
         pyshyacc.parse.
         """
 
-        def function_definition(val):
-            self.shell_funcs.add(val.name)
-            return ([val.body], None)
+        def function_definition(value):
+            self.shell_funcs.add(value.name)
+            return ([value.body], None)
 
         token_handlers = {
           "simple_command": lambda x: (None, x.words),
@@ -203,9 +205,9 @@ class ShellValue(Value):
         }
 
         for token in tokens:
-            name, val = token
+            name, value = token
             try:
-                more_tokens, words = token_handlers[name](val)
+                more_tokens, words = token_handlers[name](value)
             except KeyError:
                 raise NotImplementedError("Unsupported token type " + name)
 
@@ -294,18 +296,18 @@ class PythonValue(Value):
             return False
 
         @classmethod
-        def compare_name(cls, val, node):
+        def compare_name(cls, value, node):
             """Convenience function for the _compare_node method, which
             can accept a string (which is split by '.' for you), or an
             iterable of strings, in which case it checks to see if any of
             them match, similar to isinstance.
             """
 
-            if isinstance(val, basestring):
-                return cls._compare_name(tuple(reversed(val.split("."))),
+            if isinstance(value, basestring):
+                return cls._compare_name(tuple(reversed(value.split("."))),
                                          node)
             else:
-                return any(cls.compare_name(item, node) for item in val)
+                return any(cls.compare_name(item, node) for item in value)
 
         def __init__(self):
             self.var_references = set()
@@ -321,7 +323,7 @@ class PythonValue(Value):
 
             try:
                 funcstr = codegen.to_source(func)
-            except Exception:
+            except Exception, exc:
                 bb.msg.debug(1, None, "codegen failed to convert %s to a string" %
                                      ast.dump(func))
                 return
@@ -345,8 +347,8 @@ class PythonValue(Value):
                     self.warn(node.func, node.args[0])
             elif self.compare_name(self.expands, node.func):
                 if isinstance(node.args[0], ast.Str):
-                    val = Value(node.args[0].s, bb.data.init())
-                    for var in val.references():
+                    value = Value(node.args[0].s, bb.data.init())
+                    for var in value.references():
                         self.var_references.add(var)
                 elif isinstance(node.args[0], ast.Call) and \
                      self.compare_name(self.getvars, node.args[0].func):
@@ -356,18 +358,18 @@ class PythonValue(Value):
             elif isinstance(node.func, ast.Name):
                 self.direct_func_calls.add(node.func.id)
 
-    def __init__(self, val, metadata):
+    def __init__(self, value, metadata):
         self.visitor = self.ValueVisitor()
-        Value.__init__(self, val, metadata)
+        Value.__init__(self, value, metadata)
 
     def parse(self):
         Value.parse(self)
-        val = str(self.components)
+        value = str(self.components)
         try:
             code = compile(value, "<string>", "exec", ast.PyCF_ONLY_AST)
         except Exception, exc:
             import traceback
-            bb.msg.note(1, None, "Failed to compile %s" % val)
+            bb.msg.note(1, None, "Failed to compile %s" % value)
             bb.msg.note(1, None, str(traceback.format_exc(exc)))
         else:
             self.visitor.visit(code)
@@ -387,26 +389,25 @@ class PythonSnippet(PythonValue):
         code = str(self.components)
         codeobj = compile(code.strip(), "<expansion>", "eval")
         try:
-            val = str(bb.utils.better_eval(codeobj, {"d": self.metadata}))
+            value = str(bb.utils.better_eval(codeobj, {"d": self.metadata}))
         except Exception, exc:
             bb.msg.note(1, bb.msg.domain.Data,
                         "%s:%s while evaluating:\n%s" % (type(exc), exc,
                                                          code))
             return "<invalid>"
-        return str(Value(val, self.metadata))
+        return str(Value(value, self.metadata))
 
 
 from tokenize import generate_tokens, untokenize, INDENT, DEDENT
-try:
-    from cStringIO import StringIO
-except ImportError:
-    from StringIO import StringIO
+from StringIO import StringIO
 
-def dedent_python(codestr):
+def dedent_python(s):
+    """Remove the first level of indentation from a block of python code"""
+
     indent = None
     level = 0
     tokens = []
-    for toknum, tokval, _, _, _ in generate_tokens(StringIO(codestr).readline):
+    for toknum, tokval, _, _, _ in generate_tokens(StringIO(s).readline):
         if toknum == INDENT:
             level += 1
             if level == 1:
@@ -432,14 +433,99 @@ def value(variable, metadata):
     if metadata.getVarFlag(variable, "func"):
         if metadata.getVarFlag(variable, "python"):
             try:
-                val = dedent_python(val.expandtabs())
+                s = dedent_python(val.expandtabs())
             except Exception, exc:
                 from traceback import format_exc
                 bb.msg.note(1, None, "Failed to dedent %s:" % variable)
                 bb.msg.note(1, None, val)
                 bb.msg.note(1, None, str(format_exc(exc)))
-            return PythonValue(val, metadata)
+                s = val
+            return PythonValue(s, metadata)
         else:
             return ShellValue(val, metadata)
     else:
         return Value(val, metadata)
+
+def stable_repr(value):
+    """Produce a more stable 'repr' string for a variable
+
+    For example, for a dictionary, this ensures that the arguments shown in the
+    constructor call in the string are sorted, so they don't vary.
+    """
+
+    if isinstance(value, dict):
+        args = ", ".join("%s: %s" % (stable_repr(key), stable_repr(val))
+                         for key, val in sorted(value.iteritems()))
+    elif isinstance(value, (set, frozenset)):
+        args = repr(sorted(stable_repr(val) for val in value))
+    elif isinstance(value, list):
+        args = ", ".join(stable_repr(val) for val in value)
+    elif isinstance(value, Value):
+        args = repr(value.components)
+    else:
+        return repr(value)
+
+    return "%s(%s)" % (value.__class__.__name__, args)
+
+def hash_vars(vars, d):
+    def is_blacklisted(val):
+        for bl in d.getVar("BB_HASH_BLACKLIST", True).split():
+            if isinstance(val, Value):
+                if fnmatchcase(val.value, bl):
+                    return val.value
+            elif isinstance(val, VariableRef):
+                if all(isinstance(c, basestring) for c in val.components):
+                    valstr = str(val.components)
+                    if fnmatchcase(valstr, bl):
+                        return valstr
+            elif isinstance(val, basestring):
+                if fnmatchcase(val, bl):
+                    return val
+
+    def transform_blacklisted(item):
+        black = is_blacklisted(item)
+        if is_blacklisted(item):
+            return "${%s}" % black
+        elif isinstance(item, Value):
+            transformed = transform_blacklisted(item.components)
+            if transformed != item.components:
+                return Value(transformed, d)
+        elif isinstance(item, Components):
+            transformed = transform_blacklisted(tuple(item))
+            if transformed != item:
+                return Components(transformed)
+        elif isinstance(item, (tuple, list)):
+            return (transform_blacklisted(i) for i in item)
+        return item
+
+    def get_value(var):
+        try:
+            valobj = variables[var]
+        except KeyError:
+            valobj = variables[var] = value(var, d)
+        return valobj
+
+    def data_for_hash(var):
+        valstr = d.getVar(var, False)
+        if valstr is not None:
+            val = transform_blacklisted(Value(valstr, d))
+
+            yield (stable_repr(var), stable_repr(val))
+            for ref in val.references():
+                for other in data_for_hash(ref):
+                    yield other
+
+    data = set(chain(*[data_for_hash(var) for var in vars]))
+    string = repr(tuple(sorted(data)))
+    print(string)
+    return hashlib.md5(string).digest()
+
+def get_tasks(d):
+    for key in d.keys():
+        if d.getVarFlag(key, "task"):
+            yield key
+
+def recipe_signature(d):
+    from base64 import urlsafe_b64encode
+
+    return urlsafe_b64encode(hash_vars(get_tasks(d), d)).rstrip("=")
