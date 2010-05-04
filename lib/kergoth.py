@@ -374,6 +374,9 @@ class PythonValue(Value):
 
     def __init__(self, val, metadata):
         self.visitor = self.ValueVisitor()
+        self.var_references = None
+        self.calls = None
+
         Value.__init__(self, val, metadata)
 
     def parse(self):
@@ -388,12 +391,15 @@ class PythonValue(Value):
         else:
             self.visitor.visit(code)
 
+        self.var_references = self.visitor.var_references
+        self.calls = self.visitor.direct_func_calls
+
     def references(self):
         refs = Value.references(self)
         for ref in refs:
             yield ref
 
-        for ref in self.visitor.var_references:
+        for ref in self.var_references:
             yield ref
 
 class PythonSnippet(PythonValue):

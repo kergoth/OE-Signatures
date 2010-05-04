@@ -55,28 +55,19 @@ Known Issues / Concerns:
 
 TODO:
   - Add checking for recursion
-  - Create a Signature class to wrap up the various methods used to
-    construct it, and to make it easier to access the hash digest, the
-    base64 encoded string, and the actual data used to produce the hash,
-    which is useful for debugging.
 
   - Cleanup
     - Fix up the exception handling and bb.msg output
     - In the overridden references methods, use a uniq() utility function or a
       set to drop duplicates between the superclass references and the extra
       references gathered by the class.
-    - Sanitize the property names amongst the Value implementations
     - Should the 'references' method become a property?
     - Rename 'references', as it is specifically references to variables in
       the metadata.  This isn't the only type of reference we have anymore, as
       we'll also be tracking calls to the methods in the methodpool.
+    - Sanitize the property names amongst the Value implementations
 
   - Performance
-    - Add memoization of __str__, ideally indexed by the bits that feed into
-      the resulting string (i.e. self.components).
-
-  - PythonValue:
-    - Move the direct function call list from the visitor into the main object
-      after parsing, so the caller doesn't need to poke into the visitor
-      directly.
-    - Think about checking imports to exclude more direct func calls
+    - Do some profiling, see where caching will be appropriate
+    - Check the memory impact of potentially using Value objects rather than
+      the strings in the datastore.
