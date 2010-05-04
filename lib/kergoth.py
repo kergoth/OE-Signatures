@@ -431,7 +431,7 @@ def value(variable, metadata):
 
     val = metadata.getVar(variable, False)
     if val is None:
-        return
+        return "${%s}" % variable
 
     if metadata.getVarFlag(variable, "func"):
         if metadata.getVarFlag(variable, "python"):
@@ -448,72 +448,20 @@ def value(variable, metadata):
     else:
         return Value(val, metadata)
 
-class StableDict(object):
-    """Wrapper of a dict with a more stable repr, for use by the signature generation"""
-
-    def __init__(self, obj):
-        self.obj = obj
-
-    def __repr__(self):
-        return "{%s}" % ", ".join("%s: %s" % (stable_repr(key), stable_repr(val))
-                                  for key, val in sorted(self.obj.iteritems()))
-
-class StableList(object):
-    """Wrapper of a list with a more stable repr, for use by the signature generation"""
-
-    def __init__(self, obj):
-        self.obj = obj
-
-    def __repr__(self):
-        return "[%s]" % ", ".join(stable_repr(val) for val in self.obj)
-
-class StableTuple(object):
-    """Wrapper of a tuple with a more stable repr, for use by the signature generation"""
-
-    def __init__(self, obj):
-        self.obj = obj
-
-    def __repr__(self):
-        return "(%s)" % ", ".join(stable_repr(val) for val in self.obj)
-
-class StableSet(object):
-    """Wrapper of a set/frozenset with a more stable repr, for use by the signature generation"""
-
-    def __init__(self, obj):
-        self.obj = obj
-
-    def __repr__(self):
-        return "%s(%s)" % (self.obj.__class__.__name__,
-                           repr(sorted(stable_repr(val) for val in self.obj)))
-
-class StableValue(object):
-    """Wrapper of a Value/VariableRef with a more stable repr, for use by the signature generation"""
-
-    def __init__(self, obj):
-        self.obj = obj
-
-    def __repr__(self):
-        return "%s(%s)" % (self.obj.__class__.__name__,
-                           repr([stable_repr(val) for val in self.obj.components]))
-
-
 def stable_repr(val):
     """Produce a more stable 'repr' string for a value"""
-
     if isinstance(val, dict):
-        return StableDict(val)
+        return "{%s}" % ", ".join("%s: %s" % (stable_repr(key), stable_repr(val))
+                                  for key, val in sorted(val.iteritems()))
     elif isinstance(val, (set, frozenset)):
-        return StableSet(val)
+        return "%s(%s)" % (val.__class__.__name__, stable_repr(sorted(val)))
     elif isinstance(val, list):
-        return StableList(val)
+        return "[%s]" % ", ".join(stable_repr(val) for val in val)
     elif isinstance(val, tuple):
-        return StableTuple(val)
+        return "(%s)" % ", ".join(stable_repr(val) for val in val)
     elif isinstance(val, (VariableRef, Value)):
-        return StableValue(val)
-    elif isinstance(val, basestring):
-        return val
-    else:
-        return repr(val)
+        return "%s(%s)" % (val.__class__.__name__, stable_repr(val.components))
+    return repr(val)
 
 def hash_vars(vars, d):
     blacklist = d.getVar("BB_HASH_BLACKLIST", True)
@@ -549,8 +497,10 @@ def hash_vars(vars, d):
             transformed = transform_blacklisted(tuple(item))
             if transformed != item:
                 return Components(transformed)
-        elif isinstance(item, (tuple, list)):
+        elif isinstance(item, tuple):
             return (transform_blacklisted(i) for i in item)
+        elif isinstance(item, list):
+            return [transform_blacklisted(i) for i in item]
         return item
 
     def get_value(var):
@@ -565,14 +515,14 @@ def hash_vars(vars, d):
         if valstr is not None:
             val = transform_blacklisted(Value(valstr, d))
 
-            yield (stable_repr(var), stable_repr(val))
+            yield var, val
             for ref in val.references():
                 for other in data_for_hash(ref):
                     yield other
 
-    data = set(chain(*[data_for_hash(var) for var in vars]))
-    string = repr(tuple(sorted(data)))
-    print(string)
+    data = dict(chain(*[data_for_hash(var) for var in vars]))
+    string = stable_repr(data)
+    print("%s" % string)
     return hashlib.md5(string).digest()
 
 def get_tasks(d):
