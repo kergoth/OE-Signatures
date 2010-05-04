@@ -3,13 +3,16 @@
 import sys
 import os
 
-basedir = os.path.dirname(sys.argv[0])
-searchpath = [os.path.join(basedir, "bitbake", "lib"),
-              os.path.join(basedir, "openembedded", "lib")]
+basedir = os.path.abspath(os.path.dirname(__file__))
+oedir = os.path.dirname(basedir)
+searchpath = [os.path.join(basedir, "lib"),
+              os.path.join(oedir, "openembedded", "lib"),
+              os.path.join(oedir, "bitbake", "lib")]
 sys.path[0:0] = searchpath
+print(searchpath)
 
 import bb.data
-import oe.kergoth
+import kergoth
 
 
 def test_var_expansion():
@@ -18,31 +21,31 @@ def test_var_expansion():
     d["bar"] = "value of bar"
     d["value of foo"] = "value of 'value of foo'"
 
-    val = oe.kergoth.Value("${foo}", d)
+    val = kergoth.Value("${foo}", d)
     assert(str(val) == "value of foo")
     assert(list(val.references()) == ["foo"])
 
-    val = oe.kergoth.Value("${${foo}}", d)
+    val = kergoth.Value("${${foo}}", d)
     assert(str(val) == "value of 'value of foo'")
     assert(list(val.references()) == ["foo"])
 
-    val = oe.kergoth.Value("${${foo}} ${bar}", d)
+    val = kergoth.Value("${${foo}} ${bar}", d)
     assert(str(val) == "value of 'value of foo' value of bar")
     assert(list(val.references()) == ["foo", "bar"])
 
-    val = oe.kergoth.Value("${@5*12}", d)
+    val = kergoth.Value("${@5*12}", d)
     assert(str(val) == "60")
     assert(not list(val.references()))
 
-    val = oe.kergoth.Value("${@'boo ' + '${foo}'}", d)
+    val = kergoth.Value("${@'boo ' + '${foo}'}", d)
     assert(str(val) == "boo value of foo")
     assert(list(val.references()) == ["foo"])
 
-    val = oe.kergoth.Value("${@d.getVar('foo', True) + ' ${bar}'}", d)
+    val = kergoth.Value("${@d.getVar('foo', True) + ' ${bar}'}", d)
     assert(str(val) == "value of foo value of bar")
     assert(set(val.references()) == set(["foo", "bar"]))
 
-    val = oe.kergoth.Value(oe.kergoth.Components([val, " test"]), d)
+    val = kergoth.Value(kergoth.Components([val, " test"]), d)
     assert(str(val) == "value of foo value of bar test")
     assert(set(val.references()) == set(["foo", "bar"]))
 
@@ -74,7 +77,7 @@ def test_shell():
     d.setVar("inverted", "echo inverted...")
     d.setVarFlag("inverted", "func", True)
 
-    shellval = oe.kergoth.ShellValue(shelldata, d)
+    shellval = kergoth.ShellValue(shelldata, d)
     assert(set(shellval.references()) == set(["somevar", "inverted"]))
 
 
@@ -103,7 +106,7 @@ def test_python():
     d.setVar("somevar", pydata)
     d.setVarFlag("somevar", "func", True)
     d.setVarFlag("somevar", "python", True)
-    value = oe.kergoth.value("somevar", d)
+    value = kergoth.value("somevar", d)
     assert(set(value.references()) == set(["somevar", "bar", "something", "inexpand"]))
     assert(value.visitor.direct_func_calls == set(["test2", "a"]))
 
