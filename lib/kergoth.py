@@ -494,7 +494,7 @@ class StableValue(object):
 
     def __repr__(self):
         return "%s(%s)" % (self.obj.__class__.__name__,
-                           repr(sorted(stable_repr(val) for val in self.obj.components)))
+                           repr([stable_repr(val) for val in self.obj.components]))
 
 
 def stable_repr(val):
