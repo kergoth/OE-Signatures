@@ -447,28 +447,66 @@ def value(variable, metadata):
     else:
         return Value(val, metadata)
 
-def stable_repr(value):
+class StableDict(object):
+    """Wrapper of a dict with a nicer repr, for use by the signature generation"""
+
+    def __init__(self, obj):
+        self.obj = obj
+
+    def __repr__(self):
+        return "{%s}" % ", ".join("%s: %s" % (stable_repr(key), stable_repr(val))
+                                  for key, val in sorted(self.obj.iteritems()))
+
+class StableList(object):
+    def __init__(self, obj):
+        self.obj = obj
+
+    def __repr__(self):
+        return "[%s]" % ", ".join(stable_repr(val) for val in self.obj)
+
+class StableTuple(object):
+    def __init__(self, obj):
+        self.obj = obj
+
+    def __repr__(self):
+        return "(%s)" % ", ".join(stable_repr(val) for val in self.obj)
+
+class StableSet(object):
+    def __init__(self, obj):
+        self.obj = obj
+
+    def __repr__(self):
+        return "%s(%s)" % (self.obj.__class__.__name__,
+                           repr(sorted(stable_repr(val) for val in self.obj)))
+
+class StableValue(object):
+    def __init__(self, obj):
+        self.obj = obj
+
+    def __repr__(self):
+        return "%s(%s)" % (self.obj.__class__.__name__,
+                           repr(sorted(stable_repr(val) for val in self.obj.components)))
+
+
+def stable_repr(val):
     """Produce a more stable 'repr' string for a variable
 
     For example, for a dictionary, this ensures that the arguments shown in the
     constructor call in the string are sorted, so they don't vary.
     """
 
-    if isinstance(value, dict):
-        args = ", ".join("%s: %s" % (stable_repr(key), stable_repr(val))
-                         for key, val in sorted(value.iteritems()))
-    elif isinstance(value, (set, frozenset)):
-        args = repr(sorted(stable_repr(val) for val in value))
-    elif isinstance(value, list):
-        args = ", ".join(stable_repr(val) for val in value)
-    elif isinstance(value, VariableRef):
-        args = repr(value.components)
-    elif isinstance(value, Value):
-        args = repr(value.components)
+    if isinstance(val, dict):
+        return StableDict(val)
+    elif isinstance(val, (set, frozenset)):
+        return StableSet(val)
+    elif isinstance(val, list):
+        return StableList(val)
+    elif isinstance(val, tuple):
+        return StableTuple(val)
+    elif isinstance(val, (VariableRef, Value)):
+        return StableValue(val)
     else:
-        return repr(value)
-
-    return "%s(%s)" % (value.__class__.__name__, args)
+        return repr(val)
 
 def hash_vars(vars, d):
     blacklist = d.getVar("BB_HASH_BLACKLIST", True)
