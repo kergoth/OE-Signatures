@@ -5,7 +5,7 @@
 # that for objects which don't have a defined order, we show the arguments in
 # the repr in a defined order.
 
-BB_HASH_BLACKLIST += "*DIR *_DIR_* PATH PWD BBPATH FILE PARALLEL_MAKE"
+BB_HASH_BLACKLIST += "__* *DIR *_DIR_* PATH PWD BBPATH FILE PARALLEL_MAKE"
 
 python () {
     d.setVar("__RECIPEDATA", d)
