@@ -505,6 +505,8 @@ def stable_repr(val):
         return StableTuple(val)
     elif isinstance(val, (VariableRef, Value)):
         return StableValue(val)
+    elif isinstance(val, basestring):
+        return val
     else:
         return repr(val)
 
