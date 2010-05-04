@@ -9,7 +9,6 @@ searchpath = [os.path.join(basedir, "lib"),
               os.path.join(oedir, "openembedded", "lib"),
               os.path.join(oedir, "bitbake", "lib")]
 sys.path[0:0] = searchpath
-print(searchpath)
 
 import bb.data
 import kergoth
