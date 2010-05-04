@@ -1,32 +1,6 @@
 #!/usr/bin/env python2.6
 """Staging area for OE python bits for kergoth"""
 
-# TODO:
-#   - Add checking for recursion
-#   - Clean up the exception handling and bb.msg output
-#
-#   - Cleanup
-#     - In the overridden references methods, use a uniq() utility function or a
-#       set to drop duplicates between the superclass references and the extra
-#       references gathered by the class.
-#     - Sanitize the property names amongst the Value implementations
-#     - Should the 'references' method become a property?
-#     - Rename 'references', as it is specifically references to variables in
-#       the metadata.  This isn't the only type of reference we have anymore, as
-#       we'll also be tracking calls to the methods in the methodpool.
-#   - Performance
-#     - Add memoization of __str__, ideally indexed by the bits that feed into
-#       the resulting string (i.e. self.components).
-#
-#   - PythonValue:
-#     - Move the direct function call list from the visitor into the main object
-#       after parsing, so the caller doesn't need to poke into the visitor
-#       directly.
-#     - Think about checking imports to exclude more direct func calls
-#     - Capture FunctionDef's to exclude them from the direct func calls list
-#       - NOTE: This will be inaccurate, since it won't be accounting for
-#               contexts initially.
-
 import re
 import codegen
 import ast
@@ -499,8 +473,6 @@ def hash_vars(vars, d):
                 return Components(transformed)
         elif isinstance(item, tuple):
             return (transform_blacklisted(i) for i in item)
-        elif isinstance(item, list):
-            return [transform_blacklisted(i) for i in item]
         return item
 
     def get_value(var):
