@@ -1,3 +1,4 @@
+#!/usr/bin/env python2.6
 """Staging area for OE python bits for kergoth"""
 
 # TODO:
@@ -448,7 +449,7 @@ def value(variable, metadata):
         return Value(val, metadata)
 
 class StableDict(object):
-    """Wrapper of a dict with a nicer repr, for use by the signature generation"""
+    """Wrapper of a dict with a more stable repr, for use by the signature generation"""
 
     def __init__(self, obj):
         self.obj = obj
@@ -458,6 +459,8 @@ class StableDict(object):
                                   for key, val in sorted(self.obj.iteritems()))
 
 class StableList(object):
+    """Wrapper of a list with a more stable repr, for use by the signature generation"""
+
     def __init__(self, obj):
         self.obj = obj
 
@@ -465,6 +468,8 @@ class StableList(object):
         return "[%s]" % ", ".join(stable_repr(val) for val in self.obj)
 
 class StableTuple(object):
+    """Wrapper of a tuple with a more stable repr, for use by the signature generation"""
+
     def __init__(self, obj):
         self.obj = obj
 
@@ -472,6 +477,8 @@ class StableTuple(object):
         return "(%s)" % ", ".join(stable_repr(val) for val in self.obj)
 
 class StableSet(object):
+    """Wrapper of a set/frozenset with a more stable repr, for use by the signature generation"""
+
     def __init__(self, obj):
         self.obj = obj
 
@@ -480,6 +487,8 @@ class StableSet(object):
                            repr(sorted(stable_repr(val) for val in self.obj)))
 
 class StableValue(object):
+    """Wrapper of a Value/VariableRef with a more stable repr, for use by the signature generation"""
+
     def __init__(self, obj):
         self.obj = obj
 
@@ -489,11 +498,7 @@ class StableValue(object):
 
 
 def stable_repr(val):
-    """Produce a more stable 'repr' string for a variable
-
-    For example, for a dictionary, this ensures that the arguments shown in the
-    constructor call in the string are sorted, so they don't vary.
-    """
+    """Produce a more stable 'repr' string for a value"""
 
     if isinstance(val, dict):
         return StableDict(val)
