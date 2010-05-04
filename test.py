@@ -109,6 +109,15 @@ def test_python():
     assert(set(value.references()) == set(["somevar", "bar", "something", "inexpand"]))
     assert(value.visitor.direct_func_calls == set(["test2", "a"]))
 
+def test_signature():
+    d = bb.data.init()
+    d.setVar("alpha", "echo ${TOPDIR}/foo \"$@\"")
+    d.setVarFlags("alpha", {"func": True, "task": True})
+    d.setVar("beta", "test -f bar")
+    d.setVarFlags("beta", {"func": True, "task": True})
+    d.setVar("theta", "alpha baz")
+    d.setVarFlags("theta", {"func": True, "task": True})
+    print(kergoth.recipe_signature(d))
 
 if __name__ == "__main__":
     for name, value in globals().items():
