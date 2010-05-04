@@ -11,11 +11,11 @@ python () {
     d.setVar("__RECIPEDATA", d)
 }
 
-#SIGNATURE = "${@oe.kergoth.recipe_signature(d.getVar('__RECIPEDATA', d) or d)}"
+#SIGNATURE = "${@kergoth.recipe_signature(d.getVar('__RECIPEDATA', d) or d)}"
 
 python do_emit_signature () {
-    import oe.kergoth
-    bb.note(oe.kergoth.recipe_signature(d.getVar('__RECIPEDATA', d) or d))
+    import kergoth
+    bb.note(kergoth.recipe_signature(d.getVar('__RECIPEDATA', False) or d))
 }
 do_emit_signature[nostamp] = "1"
 addtask emit_signature
