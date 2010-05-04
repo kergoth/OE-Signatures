@@ -461,6 +461,8 @@ def stable_repr(value):
         args = repr(sorted(stable_repr(val) for val in value))
     elif isinstance(value, list):
         args = ", ".join(stable_repr(val) for val in value)
+    elif isinstance(value, VariableRef):
+        args = repr(value.components)
     elif isinstance(value, Value):
         args = repr(value.components)
     else:
@@ -497,7 +499,7 @@ def hash_vars(vars, d):
         elif isinstance(item, Value):
             transformed = transform_blacklisted(item.components)
             if transformed != item.components:
-                return Value(transformed, d)
+                return item.__class__(transformed, d)
         elif isinstance(item, Components):
             transformed = transform_blacklisted(tuple(item))
             if transformed != item:
