@@ -119,6 +119,25 @@ def test_signature():
     d.setVarFlags("theta", {"func": True, "task": True})
     print(kergoth.recipe_signature(d))
 
+import pickle
+def test_oedata():
+    import bb.fetch
+    import bb.parse
+    import bb.msg
+    import bb.utils
+
+    d = bb.data.init()
+    d.setVar("__RECIPEDATA", d)
+    d.setVar("BB_HASH_BLACKLIST", "__* *DIR *_DIR_* PATH PWD BBPATH FILE PARALLEL_MAKE")
+    vars = pickle.load(open("shasum-native-1.0-r1.vars", "rb"))
+    flags = pickle.load(open("shasum-native-1.0-r1.flags", "rb"))
+    for key, val in vars.iteritems():
+        d.setVar(key, val)
+        varflags = flags[key]
+        if varflags:
+            d.setVarFlags(key, flags[key])
+    print(kergoth.recipe_signature(d))
+
 if __name__ == "__main__":
     for name, value in globals().items():
         if name.startswith("test_") and \

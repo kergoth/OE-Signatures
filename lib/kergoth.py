@@ -13,6 +13,31 @@ import bb.msg
 import bb.utils
 
 
+class Memoized(object):
+    """Decorator that caches a function's return value each time it is called.
+    If called later with the same arguments, the cached value is returned, and
+    not re-evaluated.
+    """
+    def __init__(self, func):
+        self.func = func
+        self.cache = {}
+
+    def __call__(self, *args):
+        try:
+            return self.cache[args]
+        except KeyError:
+            self.cache[args] = value = self.func(*args)
+            return value
+        except TypeError:
+            # uncachable -- for instance, passing a list as an argument.
+            # Better to not cache than to blow up entirely.
+            return self.func(*args)
+
+    def __repr__(self):
+        """Return the function's docstring."""
+        return self.func.__doc__
+
+
 class Components(list):
     """A list of components, which concatenates itself upon str(), and runs
     str() on each component.  A given component is defined as being a
@@ -165,17 +190,17 @@ class ShellValue(Value):
             return ([val.body], None)
 
         token_handlers = {
-          "simple_command": lambda x: (None, x.words),
-          "for_clause": lambda x: (x.cmds, x.items),
-          "pipeline": lambda x: (x.commands, None),
-          "if_clause": lambda x: (chain(x.if_cmds, x.else_cmds), None),
-          "and_or": lambda x: ((x.left, x.right), None),
-          "while_clause": lambda x: (chain(x.condition, x.cmds), None),
-          "function_definition": function_definition,
-          "brace_group": lambda x: (x.cmds, None),
-          "subshell": lambda x: (x.cmds, None),
-          "async": lambda x: ([x], None),
-          "redirect_list": lambda x: ([x.cmd], None),
+            "and_or": lambda x: ((x.left, x.right), None),
+            "async": lambda x: ([x], None),
+            "brace_group": lambda x: (x.cmds, None),
+            "for_clause": lambda x: (x.cmds, x.items),
+            "function_definition": function_definition,
+            "if_clause": lambda x: (chain(x.if_cmds, x.else_cmds), None),
+            "pipeline": lambda x: (x.commands, None),
+            "redirect_list": lambda x: ([x.cmd], None),
+            "simple_command": lambda x: (None, x.words),
+            "subshell": lambda x: (x.cmds, None),
+            "while_clause": lambda x: (chain(x.condition, x.cmds), None),
         }
 
         for token in tokens:
@@ -400,6 +425,7 @@ def dedent_python(codestr):
         tokens.append((toknum, tokval))
     return untokenize(tokens)
 
+@Memoized
 def value(variable, metadata):
     """Value creation factory for a variable in the metadata"""
 
@@ -448,8 +474,13 @@ def hash_vars(vars, d):
 
         for bl in blacklist:
             if isinstance(val, Value):
-                if fnmatchcase(val.value, bl):
+                if isinstance(val.value, basestring) and \
+                   fnmatchcase(val.value, bl):
                     return val.value
+                elif all(isinstance(c, basestring) for c in val.components):
+                    valstr = str(val.components)
+                    if fnmatchcase(valstr, bl):
+                        return valstr
             elif isinstance(val, VariableRef):
                 if all(isinstance(c, basestring) for c in val.components):
                     valstr = str(val.components)
@@ -459,7 +490,11 @@ def hash_vars(vars, d):
                 if fnmatchcase(val, bl):
                     return val
 
+    @Memoized
     def transform_blacklisted(item):
+        if not blacklist:
+            return item
+
         black = is_blacklisted(item)
         if is_blacklisted(item):
             return "${%s}" % black
@@ -475,22 +510,17 @@ def hash_vars(vars, d):
             return (transform_blacklisted(i) for i in item)
         return item
 
-    def get_value(var):
-        try:
-            valobj = variables[var]
-        except KeyError:
-            valobj = variables[var] = value(var, d)
-        return valobj
-
     def data_for_hash(var):
         valstr = d.getVar(var, False)
         if valstr is not None:
-            val = transform_blacklisted(Value(valstr, d))
+            if not is_blacklisted(var):
+                val = transform_blacklisted(value(var, d))
 
-            yield var, val
-            for ref in val.references():
-                for other in data_for_hash(ref):
-                    yield other
+                yield var, val
+                if hasattr(val, "references"):
+                    for ref in val.references():
+                        for other in data_for_hash(ref):
+                            yield other
 
     data = dict(chain(*[data_for_hash(var) for var in vars]))
     string = stable_repr(data)
