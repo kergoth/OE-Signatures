@@ -33,35 +33,35 @@ Known Issues / Concerns:
   bitbake in *how* to make something happen, not *what* will happen, for a
   given task.
 - ShellValue
-  - The shell code which identifies defined functions and excludes them from the
-    list of executed commands does not take into account context.  If one
+  - The shell code which identifies defined functions and excludes them from
+    the list of executed commands does not take into account context.  If one
     defined a function in a subshell, it would still exclude it from the list.
-  - Cannot currently determine what variable (if a variable) is being referenced
-    if it's a shell variable expansion.  As an example: 'for x in 1 2 3; eval $x;
-    done'
+  - Cannot currently determine what variable (if a variable) is being
+    referenced if it's a shell variable expansion.  As an example: 'for x in 1
+    2 3; eval $x; done'
 - PythonValue:
-  - Cannot determine what variable is being referenced when the argument to the
-    getVar is passed something other than a literal string.  As an example,
+  - Cannot determine what variable is being referenced when the argument to
+    the getVar is something other than a literal string.  As an example,
     '"RDEPENDS_" + pkg' bites us.
   - Does not exclude locally imported functions from the list of executed
     functions.  If you run 'from collections import defaultdict', and run
     defaultdict, it will include defaultdict in the list of executed
     functions.  We should check for those import statements.
-  - It captures a list of functions which are executed directly
-    (that is, they're names, not attributes), but does not exclude functions
-    which are actually defined in this same block of code.  We should try to do
-    so, though it will be difficult to be full proof without taking into account
+  - It captures a list of functions which are executed directly (that is,
+    they're names, not attributes), but does not exclude functions which are
+    actually defined in this same block of code.  We should try to do so,
+    though it will be difficult to be full proof without taking into account
     contexts.
 
 TODO:
   - Add checking for recursion
-  - Clean up the exception handling and bb.msg output
   - Create a Signature class to wrap up the various methods used to
     construct it, and to make it easier to access the hash digest, the
     base64 encoded string, and the actual data used to produce the hash,
     which is useful for debugging.
 
   - Cleanup
+    - Fix up the exception handling and bb.msg output
     - In the overridden references methods, use a uniq() utility function or a
       set to drop duplicates between the superclass references and the extra
       references gathered by the class.

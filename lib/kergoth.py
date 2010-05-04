@@ -165,14 +165,14 @@ class ShellValue(Value):
     """
 
     def __init__(self, val, metadata):
-        self.shell_funcs = set()
-        self.shell_execs = set()
-        self.shell_external_execs = set()
+        self.funcdefs = set()
+        self.execs = set()
+        self.external_execs = set()
         Value.__init__(self, val, metadata)
 
     def parse(self):
         Value.parse(self)
-        self.shell_external_execs = self.parse_shell(str(self.components))
+        self.external_execs = self.parse_shell(str(self.components))
 
     def parse_shell(self, val):
         """Parse the supplied shell code in a string, returning the external
@@ -187,8 +187,8 @@ class ShellValue(Value):
 
         for token in tokens:
             self.process_tokens(token)
-        cmds = set(cmd for cmd in self.shell_execs
-                       if cmd not in self.shell_funcs)
+        cmds = set(cmd for cmd in self.execs
+                       if cmd not in self.funcdefs)
         return cmds
 
     def process_tokens(self, tokens):
@@ -197,8 +197,8 @@ class ShellValue(Value):
         """
 
         def function_definition(val):
-            self.shell_funcs.add(val.name)
-            return ([val.body], None)
+            self.funcdefs.add(val.name)
+            return [val.body], None
 
         token_handlers = {
             "and_or": lambda x: ((x.left, x.right), None),
@@ -256,14 +256,18 @@ class ShellValue(Value):
                     command = " ".join(word for _, word in words[1:])
                     self.parse_shell(command)
                 else:
-                    self.shell_execs.add(cmd)
+                    self.execs.add(cmd)
 
     def references(self):
         refs = Value.references(self)
         for ref in refs:
             yield ref
 
-        for func in self.shell_external_execs:
+        for var in self.metadata.keys():
+            if self.metadata.getVarFlag(var, "export"):
+                yield var
+
+        for func in self.external_execs:
             if self.metadata.getVar(func, False) is not None:
                 yield func
 
