@@ -1,0 +1,21 @@
+OE Signatures
+-------------
+
+This bitbake layer (OpenEmbedded Overlay) exists to test some code which I've
+thrown together.  This code changes the way variables are expanded, to allow
+more information to be retained easily about what it references.  It also adds
+tracking of what shell functions are called by other shell functions, and what
+variables are used from the metadata by python code.
+
+There are multiple purposes of this, but the most immediate is to implement
+intelligent signature/hash generation of the metadata (or chunks of the
+metadata).  This is necessary in order to provide sane binary caching support,
+and in the future, will allow bitbake to move away from the "stamp" concept
+entirely, instead relying on tracking of the input and output of tasks, and
+the pieces of the metadata they use.
+
+Next, this should allow us, in the long term, to allow one to edit a
+configuration file without reparsing the world.  Of course, Holger's ast work
+is a step in the right direction for that also, but this would allow us to
+bypass re-execution of the ast statements as well, simply letting 'dirty'
+state information flow through the variable references.
