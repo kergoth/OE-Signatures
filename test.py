@@ -177,4 +177,5 @@ if __name__ == "__main__":
     for name, obj in globals().items():
         if name.startswith("test_") and \
            hasattr(obj, "__call__"):
+            print("Running %s" % name)
             obj()
