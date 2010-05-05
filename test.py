@@ -68,6 +68,18 @@ shelldata = """
     ) || aiee
     ! inverted
     echo ${somevar}
+
+    case foo in
+        bar)
+            echo bar
+            ;;
+        baz)
+            echo baz
+            ;;
+        foo*)
+            echo foo
+            ;;
+    esac
 """
 
 def test_shell():
@@ -125,6 +137,10 @@ def test_oedata():
     import bb.parse
     import bb.msg
     import bb.utils
+    import os.path
+
+    if not os.path.exists("shasum-native-1.0-r1.vars"):
+        return
 
     d = bb.data.init()
     d.setVar("__RECIPEDATA", d)
@@ -139,7 +155,7 @@ def test_oedata():
     print(kergoth.Signature(d))
 
 if __name__ == "__main__":
-    for name, value in globals().items():
+    for name, obj in globals().items():
         if name.startswith("test_") and \
-           hasattr(value, "__call__"):
-            value()
+           hasattr(obj, "__call__"):
+            obj()
