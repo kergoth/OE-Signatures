@@ -59,6 +59,9 @@ Known Issues / Concerns:
 
 TODO:
   - Add checking for recursion
+  - May want to change the way Value works wrt the value and components
+    properties.  Perhaps the real Value should always go from components, and
+    provide a factory that does the parsing into the components.. hmm.
 
   - Cleanup
     - Fix up the exception handling and bb.msg output
