@@ -48,6 +48,9 @@ def test_var_expansion():
     assert(str(val) == "value of foo value of bar test")
     assert(set(val.references()) == set(["foo", "bar"]))
 
+    val = kergoth.Value("${undefinedvar} meh", d)
+    assert(str(val) == "${undefinedvar} meh")
+    assert(set(val.references()) == set(["undefinedvar"]))
 
 shelldata = """
     foo () {
@@ -130,6 +133,22 @@ def test_signature():
     d.setVar("theta", "alpha baz")
     d.setVarFlags("theta", {"func": True, "task": True})
     print(kergoth.Signature(d))
+
+    d["blacklistedvar"] = "blacklistedvalue"
+    d["BB_HASH_BLACKLIST"] = "blacklisted*"
+    d["testbl"] = "${@5} foo ${blacklistedvar} bar"
+    signature = kergoth.Signature(d, keys=["testbl"])
+    print(signature)
+
+    d["someval"] = "${undefinedvar} ${blacklistedvar} meh"
+    signature = kergoth.Signature(d, keys=["someval"])
+    print(signature.data)
+    print(signature)
+
+    d["anotherval"] = "${blacklistedvar}"
+    signature = kergoth.Signature(d, keys=["anotherval"])
+    print(signature.data)
+    print(signature)
 
 import pickle
 def test_oedata():
