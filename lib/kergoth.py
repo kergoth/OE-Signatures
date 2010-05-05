@@ -337,8 +337,14 @@ class PythonValue(Value):
             a reference.
             """
 
-            bb.msg.debug(1, None, "Warning: in call to '%s', argument '%s' is not a literal" %
-                                 (codegen.to_source(func), codegen.to_source(arg)))
+            try:
+                funcstr = codegen.to_source(func)
+                argstr = codegen.to_source(arg)
+            except TypeError:
+                bb.msg.debug(2, None, "Failed to convert function and argument to source form")
+            else:
+                bb.msg.debug(1, None, "Warning: in call to '%s', argument '%s' is not a literal" %
+                                     (funcstr, argstr))
 
         def visit_Call(self, node):
             ast.NodeVisitor.generic_visit(self, node)
