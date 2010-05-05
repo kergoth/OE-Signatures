@@ -70,7 +70,7 @@ class Value(object):
     internally.  Running str() on this is equivalent to doing the same to its
     internal Components."""
 
-    var_re = re.compile(r"(\$\{|\})")
+    variable_ref = re.compile(r"(\$\{|\})")
 
     def __init__(self, value, metadata):
         if not isinstance(value, basestring):
@@ -130,7 +130,7 @@ class Value(object):
             self.components.append(self.value)
             return
 
-        tokens = (var for var in self.var_re.split(self.value) if var)
+        tokens = (var for var in self.variable_ref.split(self.value) if var)
         result = Components()
         current = None
         stack = deque()
@@ -482,8 +482,8 @@ class Signature(object):
         if keys:
             self.keys = keys
         else:
-            self.keys = [var for var in self.metadata.keys()
-                         if metadata.getVarFlag(var, "task")]
+            self.keys = [key for key in self.metadata.keys()
+                         if metadata.getVarFlag(key, "task")]
 
         if blacklist:
             self.blacklist = blacklist
@@ -526,24 +526,24 @@ class Signature(object):
         if self._data:
             return self._data
 
-        def data_for_hash(var):
+        def data_for_hash(key):
             """Returns an iterator over the variable names and their values, including references"""
 
-            valstr = self.metadata.getVar(var, False)
+            valstr = self.metadata.getVar(key, False)
             if valstr is not None:
-                if not self.is_blacklisted(var):
-                    value = self.transform_blacklisted(new_value(var, self.metadata))
+                if not self.is_blacklisted(key):
+                    value = self.transform_blacklisted(new_value(key, self.metadata))
 
-                    yield var, value
+                    yield key, value
                     if hasattr(value, "references"):
                         for ref in value.references():
                             for other in data_for_hash(ref):
                                 yield other
 
         if not self.keys:
-            self.keys = [var for var in self.metadata.keys()
-                         if self.metadata.getVarFlag(var, "task")]
-        data = self._data = dict(chain(*[data_for_hash(var) for var in self.keys]))
+            self.keys = [key for key in self.metadata.keys()
+                         if self.metadata.getVarFlag(key, "task")]
+        data = self._data = dict(chain(*[data_for_hash(key) for key in self.keys]))
         return data
 
     def is_blacklisted(self, item):
