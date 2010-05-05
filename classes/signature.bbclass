@@ -22,7 +22,7 @@ addtask emit_signature
 
 do_emit_signature_all[nostamp] = "1"
 do_emit_signature_all[recrdeptask] = "do_emit_signature"
-addtask emit_signature_all after emitsignature
+addtask emit_signature_all after emit_signature
 
 python do_emit_data () {
     import pickle
