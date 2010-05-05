@@ -105,7 +105,7 @@ def test_python():
     d.setVar("somevar", pydata)
     d.setVarFlag("somevar", "func", True)
     d.setVarFlag("somevar", "python", True)
-    value = kergoth.value("somevar", d)
+    value = kergoth.new_value("somevar", d)
     assert(set(value.references()) == set(["somevar", "bar", "something", "inexpand"]))
     assert(value.visitor.direct_func_calls == set(["test2", "a"]))
 

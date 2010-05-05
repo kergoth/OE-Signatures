@@ -554,8 +554,8 @@ class Signature(object):
 
         for bl in self.blacklist:
             if isinstance(item, Value):
-                if isinstance(item.item, basestring) and \
-                   fnmatchcase(item.item, bl):
+                if isinstance(item.value, basestring) and \
+                   fnmatchcase(item.value, bl):
                     return item.value
                 elif all(isinstance(c, basestring) for c in item.components):
                     valstr = str(item.components)
