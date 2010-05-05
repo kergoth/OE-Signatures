@@ -15,7 +15,7 @@ python () {
 
 python do_emit_signature () {
     import kergoth
-    bb.note(kergoth.recipe_signature(d.getVar('__RECIPEDATA', False) or d))
+    bb.note(str(kergoth.Signature(d.getVar('__RECIPEDATA', False) or d)))
 }
 do_emit_signature[nostamp] = "1"
 addtask emit_signature
