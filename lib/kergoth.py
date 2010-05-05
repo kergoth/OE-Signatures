@@ -94,7 +94,7 @@ class Value(object):
         return hash((self.components, self.metadata))
 
     def __repr__(self):
-        return "%s(%s, %s)" % (self.__class__.__name__, repr(self.value),
+        return "%s(%s, %s)" % (self.__class__.__name__, repr(self.components),
                                repr(self.metadata))
 
     def __str__(self):
