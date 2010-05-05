@@ -541,10 +541,9 @@ class Signature(object):
                     value = self.transform_blacklisted(new_value(key, self.metadata))
 
                     yield key, value
-                    if hasattr(value, "references"):
-                        for ref in value.references():
-                            for other in data_for_hash(ref):
-                                yield other
+                    for ref in value.references():
+                        for other in data_for_hash(ref):
+                            yield other
 
         if not self.keys:
             self.keys = [key for key in self.metadata.keys()
@@ -558,23 +557,16 @@ class Signature(object):
         if not self.blacklist:
             return
 
+        if isinstance(item, basestring):
+            valstr = item
+        elif all(isinstance(c, basestring) for c in item.components):
+            valstr = str(item.components)
+        else:
+            return
+
         for bl in self.blacklist:
-            if isinstance(item, Value):
-                if isinstance(item.value, basestring) and \
-                   fnmatchcase(item.value, bl):
-                    return item.value
-                elif all(isinstance(c, basestring) for c in item.components):
-                    valstr = str(item.components)
-                    if fnmatchcase(valstr, bl):
-                        return valstr
-            elif isinstance(item, VariableRef):
-                if all(isinstance(c, basestring) for c in item.components):
-                    valstr = str(item.components)
-                    if fnmatchcase(valstr, bl):
-                        return valstr
-            elif isinstance(item, basestring):
-                if fnmatchcase(item, bl):
-                    return item
+            if fnmatchcase(valstr, bl):
+                return "${%s}" % valstr
 
     def transform_blacklisted(self, item):
         """Transform the supplied item tree, changing all blacklisted objects
@@ -584,10 +576,7 @@ class Signature(object):
         if not self.blacklist:
             return item
 
-        black = self.is_blacklisted(item)
-        if black:
-            return "${%s}" % black
-        elif isinstance(item, Value):
+        if isinstance(item, Value):
             transformed = self.transform_blacklisted(item.components)
             if transformed != item.components:
                 return item.__class__(transformed, self.metadata)
@@ -597,4 +586,8 @@ class Signature(object):
                 return Components(transformed)
         elif isinstance(item, tuple):
             return (self.transform_blacklisted(i) for i in item)
+        elif isinstance(item, VariableRef):
+            black = self.is_blacklisted(item)
+            if black:
+                return black
         return item
