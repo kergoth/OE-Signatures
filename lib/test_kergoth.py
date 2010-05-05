@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 
+import unittest
 import sys
 import os
 
-basedir = os.path.abspath(os.path.dirname(__file__))
+basedir = os.path.dirname(os.path.abspath(os.path.dirname(__file__)))
 oedir = os.path.dirname(basedir)
 searchpath = [os.path.join(basedir, "lib"),
               os.path.join(oedir, "openembedded", "lib"),
@@ -13,142 +14,159 @@ sys.path[0:0] = searchpath
 import bb.data
 import kergoth
 
+class TestExpansions(unittest.TestCase):
+    def setUp(self):
+        self.d = bb.data.init()
+        self.d["foo"] = "value of foo"
+        self.d["bar"] = "value of bar"
+        self.d["value of foo"] = "value of 'value of foo'"
 
-def test_var_expansion():
-    d = bb.data.init()
-    d["foo"] = "value of foo"
-    d["bar"] = "value of bar"
-    d["value of foo"] = "value of 'value of foo'"
+    def test_one_var(self):
+        val = kergoth.Value("${foo}", self.d)
+        self.assertEqual(str(val), "value of foo")
+        self.assertEqual(set(val.references()), set(["foo"]))
 
-    val = kergoth.Value("${foo}", d)
-    assert(str(val) == "value of foo")
-    assert(list(val.references()) == ["foo"])
+    def test_indirect_one_var(self):
+        val = kergoth.Value("${${foo}}", self.d)
+        self.assertEqual(str(val), "value of 'value of foo'")
+        self.assertEqual(set(val.references()), set(["foo"]))
 
-    val = kergoth.Value("${${foo}}", d)
-    assert(str(val) == "value of 'value of foo'")
-    assert(list(val.references()) == ["foo"])
+    def test_indirect_and_another(self):
+        val = kergoth.Value("${${foo}} ${bar}", self.d)
+        self.assertEqual(str(val), "value of 'value of foo' value of bar")
+        self.assertEqual(set(val.references()), set(["foo", "bar"]))
 
-    val = kergoth.Value("${${foo}} ${bar}", d)
-    assert(str(val) == "value of 'value of foo' value of bar")
-    assert(list(val.references()) == ["foo", "bar"])
+    def test_python_snippet(self):
+        val = kergoth.Value("${@5*12}", self.d)
+        self.assertEqual(str(val), "60")
+        self.assertFalse(set(val.references()))
 
-    val = kergoth.Value("${@5*12}", d)
-    assert(str(val) == "60")
-    assert(not list(val.references()))
+    def test_expand_in_python_snippet(self):
+        val = kergoth.Value("${@'boo ' + '${foo}'}", self.d)
+        self.assertEqual(str(val), "boo value of foo")
+        self.assertEqual(set(val.references()), set(["foo"]))
 
-    val = kergoth.Value("${@'boo ' + '${foo}'}", d)
-    assert(str(val) == "boo value of foo")
-    assert(list(val.references()) == ["foo"])
+    def test_python_snippet_getvar(self):
+        val = kergoth.Value("${@d.getVar('foo', True) + ' ${bar}'}", self.d)
+        self.assertEqual(str(val), "value of foo value of bar")
+        self.assertEqual(set(val.references()), set(["foo", "bar"]))
 
-    val = kergoth.Value("${@d.getVar('foo', True) + ' ${bar}'}", d)
-    assert(str(val) == "value of foo value of bar")
-    assert(set(val.references()) == set(["foo", "bar"]))
+    def test_value_containing_value(self):
+        otherval = kergoth.Value("${@d.getVar('foo', True) + ' ${bar}'}", self.d)
+        val = kergoth.Value(kergoth.Components([otherval, " test"]), self.d)
+        self.assertEqual(str(val), "value of foo value of bar test")
+        self.assertEqual(set(val.references()), set(["foo", "bar"]))
 
-    val = kergoth.Value(kergoth.Components([val, " test"]), d)
-    assert(str(val) == "value of foo value of bar test")
-    assert(set(val.references()) == set(["foo", "bar"]))
+    def test_reference_undefined_var(self):
+        val = kergoth.Value("${undefinedvar} meh", self.d)
+        self.assertEqual(str(val), "${undefinedvar} meh")
+        self.assertEqual(set(val.references()), set(["undefinedvar"]))
 
-    val = kergoth.Value("${undefinedvar} meh", d)
-    assert(str(val) == "${undefinedvar} meh")
-    assert(set(val.references()) == set(["undefinedvar"]))
 
-shelldata = """
-    foo () {
-        bar
-    }
-    {
-        echo baz
-        $(heh)
-        eval `moo`
-    }
-    a=b
-    c=d
-    (
-        true && false
-        test -f foo
-        testval=something
-        $testval
-    ) || aiee
-    ! inverted
-    echo ${somevar}
+class TestContentsTracking(unittest.TestCase):
+    def setUp(self):
+        self.d = bb.data.init()
 
-    case foo in
-        bar)
-            echo bar
-            ;;
-        baz)
+    pydata = """
+        bb.data.getVar('somevar', d, True)
+        def test():
+            foo = 'bar %s' % 'foo'
+            def test2():
+                d.getVar(foo, True)
+            d.getVar('bar', False)
+            test2()
+
+        def a():
+            \"\"\"some
+    stuff
+            \"\"\"
+            return "heh"
+
+        bb.data.expand(bb.data.getVar("something", False, d), d)
+        bb.data.expand("${inexpand} somethingelse", d)
+        bb.data.getVar(a(), d, False)
+    """
+
+    def test_python(self):
+        self.d.setVar("somevar", self.pydata)
+        self.d.setVarFlags("somevar", {"func": True, "python": True})
+
+        value = kergoth.new_value("somevar", self.d)
+        self.assertEquals(set(value.references()), set(["somevar", "bar", "something", "inexpand"]))
+        self.assertEquals(set(value.calls), set(["test2", "a"]))
+
+    shelldata = """
+        foo () {
+            bar
+        }
+        {
             echo baz
-            ;;
-        foo*)
-            echo foo
-            ;;
-    esac
-"""
+            $(heh)
+            eval `moo`
+        }
+        a=b
+        c=d
+        (
+            true && false
+            test -f foo
+            testval=something
+            $testval
+        ) || aiee
+        ! inverted
+        echo ${somevar}
 
-def test_shell():
-    d = bb.data.init()
-    d.setVar("somevar", "heh")
-    d.setVar("inverted", "echo inverted...")
-    d.setVarFlag("inverted", "func", True)
+        case foo in
+            bar)
+                echo bar
+                ;;
+            baz)
+                echo baz
+                ;;
+            foo*)
+                echo foo
+                ;;
+        esac
+    """
 
-    shellval = kergoth.ShellValue(shelldata, d)
-    assert(set(shellval.references()) == set(["somevar", "inverted"]))
+    def test_shell(self):
+        self.d.setVar("somevar", "heh")
+        self.d.setVar("inverted", "echo inverted...")
+        self.d.setVarFlag("inverted", "func", True)
 
+        shellval = kergoth.ShellValue(self.shelldata, self.d)
+        self.assertEquals(set(shellval.references()), set(["somevar", "inverted"]))
 
-pydata = """
-    bb.data.getVar('somevar', d, True)
-    def test():
-        foo = 'bar %s' % 'foo'
-        def test2():
-            d.getVar(foo, True)
-        d.getVar('bar', False)
-        test2()
+class TestSignatureGeneration(unittest.TestCase):
+    def setUp(self):
+        self.d = bb.data.init()
+        self.d["BB_HASH_BLACKLIST"] = "blacklisted*"
 
-    def a():
-        \"\"\"some
-stuff
-        \"\"\"
-        return "heh"
+    def test_full_signature(self):
+        self.d.setVar("alpha", "echo ${TOPDIR}/foo \"$@\"")
+        self.d.setVarFlags("alpha", {"func": True, "task": True})
+        self.d.setVar("beta", "test -f bar")
+        self.d.setVarFlags("beta", {"func": True, "task": True})
+        self.d.setVar("theta", "alpha baz")
+        self.d.setVarFlags("theta", {"func": True, "task": True})
+        signature = kergoth.Signature(self.d)
+        self.assertEquals(signature.data_string, "{'alpha': ShellValue(['echo ', VariableRef(['TOPDIR']), '/foo \"$@\"']), 'beta': ShellValue(['test -f bar']), 'theta': ShellValue(['alpha baz'])}")
 
-    bb.data.expand(bb.data.getVar("something", False, d), d)
-    bb.data.expand("${inexpand} somethingelse", d)
-    bb.data.getVar(a(), d, False)
-"""
+    def test_signature_blacklisted(self):
+        self.d["blacklistedvar"] = "blacklistedvalue"
+        self.d["testbl"] = "${@5} foo ${blacklistedvar} bar"
+        signature = kergoth.Signature(self.d, keys=["testbl"])
+        self.assertEqual(signature.data_string, "{'testbl': Value([PythonSnippet(['5']), ' foo ', '${blacklistedvar}', ' bar'])}")
 
-def test_python():
-    d = bb.data.init()
-    d.setVar("somevar", pydata)
-    d.setVarFlag("somevar", "func", True)
-    d.setVarFlag("somevar", "python", True)
-    value = kergoth.new_value("somevar", d)
-    assert(set(value.references()) == set(["somevar", "bar", "something", "inexpand"]))
-    assert(value.visitor.direct_func_calls == set(["test2", "a"]))
+    def test_signature_only_blacklisted(self):
+        self.d["anotherval"] = "${blacklistedvar}"
+        signature = kergoth.Signature(self.d, keys=["anotherval"])
+        self.assertEquals(signature.data_string, "{'anotherval': Value(['${blacklistedvar}'])}")
 
-def test_signature():
-    d = bb.data.init()
-    d.setVar("alpha", "echo ${TOPDIR}/foo \"$@\"")
-    d.setVarFlags("alpha", {"func": True, "task": True})
-    d.setVar("beta", "test -f bar")
-    d.setVarFlags("beta", {"func": True, "task": True})
-    d.setVar("theta", "alpha baz")
-    d.setVarFlags("theta", {"func": True, "task": True})
-    print(kergoth.Signature(d))
+    def test_signature_undefined(self):
+        self.d["someval"] = "${undefinedvar} ${blacklistedvar} meh"
+        signature = kergoth.Signature(self.d, keys=["someval"])
+        self.assertEquals(signature.data_string, "{'someval': Value([VariableRef(['undefinedvar']), ' ', '${blacklistedvar}', ' meh'])}")
 
-    d["blacklistedvar"] = "blacklistedvalue"
-    d["BB_HASH_BLACKLIST"] = "blacklisted*"
-    d["testbl"] = "${@5} foo ${blacklistedvar} bar"
-    signature = kergoth.Signature(d, keys=["testbl"])
-    print(signature)
-
-    d["someval"] = "${undefinedvar} ${blacklistedvar} meh"
-    signature = kergoth.Signature(d, keys=["someval"])
-    print(signature.data)
-    print(signature)
-
-    d["anotherval"] = "${blacklistedvar}"
-    signature = kergoth.Signature(d, keys=["anotherval"])
-    print(signature.data)
-    print(signature)
 
 import pickle
 def test_oedata():
@@ -172,10 +190,3 @@ def test_oedata():
         if varflags:
             d.setVarFlags(key, flags[key])
     print(kergoth.Signature(d))
-
-if __name__ == "__main__":
-    for name, obj in globals().items():
-        if name.startswith("test_") and \
-           hasattr(obj, "__call__"):
-            print("Running %s" % name)
-            obj()

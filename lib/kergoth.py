@@ -483,6 +483,7 @@ class Signature(object):
     def __init__(self, metadata, keys = None, blacklist = None):
         self._md5 = None
         self._data = None
+        self._data_string = None
         self.metadata = metadata
 
         if keys:
@@ -521,9 +522,16 @@ class Signature(object):
 
         value = self._md5
         if value is None:
-            string = stable_repr(self.data)
-            value = self._md5 = hashlib.md5(string)
+            value = self._md5 = hashlib.md5(self.data_string)
         return value
+
+    @property
+    def data_string(self):
+        """Stabilized string representation of the data to be hashed"""
+        string = self._data_string
+        if string is None:
+            string = self._data_string = stable_repr(self.data)
+        return string
 
     @property
     def data(self):
