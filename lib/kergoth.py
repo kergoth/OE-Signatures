@@ -554,7 +554,7 @@ class Signature(object):
         if not self.blacklist:
             return
 
-        for bl in blacklist:
+        for bl in self.blacklist:
             if isinstance(val, Value):
                 if isinstance(val.value, basestring) and \
                    fnmatchcase(val.value, bl):
@@ -580,13 +580,13 @@ class Signature(object):
         if black:
             return "${%s}" % black
         elif isinstance(item, Value):
-            transformed = transform_blacklisted(item.components)
+            transformed = self.transform_blacklisted(item.components)
             if transformed != item.components:
                 return item.__class__(transformed, self.metadata)
         elif isinstance(item, Components):
-            transformed = transform_blacklisted(tuple(item))
+            transformed = self.transform_blacklisted(tuple(item))
             if transformed != item:
                 return Components(transformed)
         elif isinstance(item, tuple):
-            return (transform_blacklisted(i) for i in item)
+            return (self.transform_blacklisted(i) for i in item)
         return item
