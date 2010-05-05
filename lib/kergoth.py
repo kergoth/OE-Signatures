@@ -62,7 +62,7 @@ class VariableRef(object):
 
     def __str__(self):
         name = str(self.components)
-        return str(value(name, self.metadata))
+        return str(new_value(name, self.metadata))
 
 
 class Value(object):
@@ -72,12 +72,12 @@ class Value(object):
 
     var_re = re.compile(r"(\$\{|\})")
 
-    def __init__(self, val, metadata):
-        if not isinstance(val, basestring):
-            self.components = Components(val)
+    def __init__(self, value, metadata):
+        if not isinstance(value, basestring):
+            self.components = Components(value)
             self.value = None
         else:
-            self.value = val
+            self.value = value
             self.components = Components()
         self.metadata = metadata
         self.parse()
@@ -103,8 +103,10 @@ class Value(object):
     def references(self):
         """Return an iterable of the variables this Value references"""
 
-        def search(val):
-            for item in val.components:
+        def search(value):
+            """Recursively search a value to get its references"""
+
+            for item in value.components:
                 if isinstance(item, VariableRef) and \
                    all(isinstance(x, basestring) for x in item.components):
                     yield str(item.components)
@@ -141,15 +143,15 @@ class Value(object):
                     if hasattr(current[0], "startswith") and \
                        current[0].startswith("@"):
                         current[0] = current[0][1:]
-                        val = PythonSnippet(current, self.metadata)
+                        value = PythonSnippet(current, self.metadata)
                     else:
-                        val = VariableRef(current, self.metadata)
+                        value = VariableRef(current, self.metadata)
 
                     current = stack.pop()
                     if current is None:
-                        result.append(val)
+                        result.append(value)
                     else:
-                        current.append(val)
+                        current.append(value)
                 else:
                     current.append(token)
             else:
@@ -164,25 +166,25 @@ class ShellValue(Value):
     to extract calls to other shell functions in the metadata.
     """
 
-    def __init__(self, val, metadata):
+    def __init__(self, value, metadata):
         self.funcdefs = set()
         self.execs = set()
         self.external_execs = set()
-        Value.__init__(self, val, metadata)
+        Value.__init__(self, value, metadata)
 
     def parse(self):
         Value.parse(self)
         self.external_execs = self.parse_shell(str(self.components))
 
-    def parse_shell(self, val):
+    def parse_shell(self, value):
         """Parse the supplied shell code in a string, returning the external
         commands it executes.
         """
 
         try:
-            tokens, _ = pyshyacc.parse(val, True, False)
+            tokens, _ = pyshyacc.parse(value, True, False)
         except sherrors.ShellSyntaxError:
-            bb.msg.note(1, None, "Shell syntax error when parsing:\n%s" % val)
+            bb.msg.note(1, None, "Shell syntax error when parsing:\n%s" % value)
             return ()
 
         for token in tokens:
@@ -196,9 +198,9 @@ class ShellValue(Value):
         pyshyacc.parse.
         """
 
-        def function_definition(val):
-            self.funcdefs.add(val.name)
-            return [val.body], None
+        def function_definition(value):
+            self.funcdefs.add(value.name)
+            return [value.body], None
 
         token_handlers = {
             "and_or": lambda x: ((x.left, x.right), None),
@@ -215,9 +217,9 @@ class ShellValue(Value):
         }
 
         for token in tokens:
-            name, val = token
+            name, value = token
             try:
-                more_tokens, words = token_handlers[name](val)
+                more_tokens, words = token_handlers[name](value)
             except KeyError:
                 raise NotImplementedError("Unsupported token type " + name)
 
@@ -310,18 +312,18 @@ class PythonValue(Value):
             return False
 
         @classmethod
-        def compare_name(cls, val, node):
+        def compare_name(cls, value, node):
             """Convenience function for the _compare_node method, which
             can accept a string (which is split by '.' for you), or an
             iterable of strings, in which case it checks to see if any of
             them match, similar to isinstance.
             """
 
-            if isinstance(val, basestring):
-                return cls._compare_name(tuple(reversed(val.split("."))),
+            if isinstance(value, basestring):
+                return cls._compare_name(tuple(reversed(value.split("."))),
                                          node)
             else:
-                return any(cls.compare_name(item, node) for item in val)
+                return any(cls.compare_name(item, node) for item in value)
 
         def __init__(self):
             self.var_references = set()
@@ -335,22 +337,8 @@ class PythonValue(Value):
             a reference.
             """
 
-            try:
-                funcstr = codegen.to_source(func)
-            except Exception:
-                bb.msg.debug(1, None, "codegen failed to convert %s to a string" %
-                                     ast.dump(func))
-                return
-
-            try:
-                argstr = codegen.to_source(arg)
-            except Exception, exc:
-                bb.msg.debug(1, None, "codegen failed to convert %s to a string" %
-                                      ast.dump(arg))
-                return
-
             bb.msg.debug(1, None, "Warning: in call to '%s', argument '%s' is not a literal" %
-                                 (funcstr, argstr))
+                                 (codegen.to_source(func), codegen.to_source(arg)))
 
         def visit_Call(self, node):
             ast.NodeVisitor.generic_visit(self, node)
@@ -361,8 +349,8 @@ class PythonValue(Value):
                     self.warn(node.func, node.args[0])
             elif self.compare_name(self.expands, node.func):
                 if isinstance(node.args[0], ast.Str):
-                    val = Value(node.args[0].s, bb.data.init())
-                    for var in val.references():
+                    value = Value(node.args[0].s, bb.data.init())
+                    for var in value.references():
                         self.var_references.add(var)
                 elif isinstance(node.args[0], ast.Call) and \
                      self.compare_name(self.getvars, node.args[0].func):
@@ -372,21 +360,21 @@ class PythonValue(Value):
             elif isinstance(node.func, ast.Name):
                 self.direct_func_calls.add(node.func.id)
 
-    def __init__(self, val, metadata):
+    def __init__(self, value, metadata):
         self.visitor = self.ValueVisitor()
         self.var_references = None
         self.calls = None
 
-        Value.__init__(self, val, metadata)
+        Value.__init__(self, value, metadata)
 
     def parse(self):
         Value.parse(self)
-        val = str(self.components)
+        value = str(self.components)
         try:
-            code = compile(val, "<string>", "exec", ast.PyCF_ONLY_AST)
+            code = compile(value, "<string>", "exec", ast.PyCF_ONLY_AST)
         except Exception, exc:
             import traceback
-            bb.msg.note(1, None, "Failed to compile %s" % val)
+            bb.msg.note(1, None, "Failed to compile %s" % value)
             bb.msg.note(1, None, str(traceback.format_exc(exc)))
         else:
             self.visitor.visit(code)
@@ -409,13 +397,13 @@ class PythonSnippet(PythonValue):
         code = str(self.components)
         codeobj = compile(code.strip(), "<expansion>", "eval")
         try:
-            val = str(bb.utils.better_eval(codeobj, {"d": self.metadata}))
+            value = str(bb.utils.better_eval(codeobj, {"d": self.metadata}))
         except Exception, exc:
             bb.msg.note(1, bb.msg.domain.Data,
                         "%s:%s while evaluating:\n%s" % (type(exc), exc,
                                                          code))
             return "<invalid>"
-        return str(Value(val, self.metadata))
+        return str(Value(value, self.metadata))
 
 
 from tokenize import generate_tokens, untokenize, INDENT, DEDENT
@@ -447,53 +435,54 @@ def dedent_python(codestr):
     return untokenize(tokens)
 
 @Memoized
-def value(variable, metadata):
+def new_value(variable, metadata):
     """Value creation factory for a variable in the metadata"""
 
-    val = metadata.getVar(variable, False)
-    if val is None:
+    value = metadata.getVar(variable, False)
+    if value is None:
         return "${%s}" % variable
 
     if metadata.getVarFlag(variable, "func"):
         if metadata.getVarFlag(variable, "python"):
-            try:
-                val = dedent_python(val.expandtabs())
-            except Exception, exc:
-                from traceback import format_exc
-                bb.msg.note(1, None, "Failed to dedent %s:" % variable)
-                bb.msg.note(1, None, val)
-                bb.msg.note(1, None, str(format_exc(exc)))
-            return PythonValue(val, metadata)
+            return PythonValue(dedent_python(value.expandtabs()), metadata)
         else:
-            return ShellValue(val, metadata)
+            return ShellValue(value, metadata)
     else:
-        return Value(val, metadata)
+        return Value(value, metadata)
 
-def stable_repr(val):
+def stable_repr(value):
     """Produce a more stable 'repr' string for a value"""
-    if isinstance(val, dict):
-        return "{%s}" % ", ".join("%s: %s" % (stable_repr(key), stable_repr(val))
-                                  for key, val in sorted(val.iteritems()))
-    elif isinstance(val, (set, frozenset)):
-        return "%s(%s)" % (val.__class__.__name__, stable_repr(sorted(val)))
-    elif isinstance(val, list):
-        return "[%s]" % ", ".join(stable_repr(val) for val in val)
-    elif isinstance(val, tuple):
-        return "(%s)" % ", ".join(stable_repr(val) for val in val)
-    elif isinstance(val, (VariableRef, Value)):
-        return "%s(%s)" % (val.__class__.__name__, stable_repr(val.components))
-    return repr(val)
+    if isinstance(value, dict):
+        return "{%s}" % ", ".join("%s: %s" % (stable_repr(key), stable_repr(value))
+                                  for key, value in sorted(value.iteritems()))
+    elif isinstance(value, (set, frozenset)):
+        return "%s(%s)" % (value.__class__.__name__, stable_repr(sorted(value)))
+    elif isinstance(value, list):
+        return "[%s]" % ", ".join(stable_repr(value) for value in value)
+    elif isinstance(value, tuple):
+        return "(%s)" % ", ".join(stable_repr(value) for value in value)
+    elif isinstance(value, (VariableRef, Value)):
+        return "%s(%s)" % (value.__class__.__name__, stable_repr(value.components))
+    return repr(value)
 
 class Signature(object):
-    def __init__(self, metadata, vars = None, blacklist = None):
+    """A signature is produced uniquely identifying part of the BitBake metadata.
+
+    keys is the list of variable names to include in the signature (default is
+    all current tasks).  blacklist is a list of globs which identify variables
+    which should not be included at all, even when referenced by other
+    variables.
+    """
+
+    def __init__(self, metadata, keys = None, blacklist = None):
         self._md5 = None
         self._data = None
         self.metadata = metadata
 
-        if vars:
-            self.vars = vars
+        if keys:
+            self.keys = keys
         else:
-            self.vars = [var for var in self.metadata.keys()
+            self.keys = [var for var in self.metadata.keys()
                          if metadata.getVarFlag(var, "task")]
 
         if blacklist:
@@ -506,10 +495,10 @@ class Signature(object):
                 self.blacklist = None
 
     def __repr__(self):
-        return "Signature(%s, %s, %s)" % (self.metadata, self.vars, self.blacklist)
+        return "Signature(%s, %s, %s)" % (self.metadata, self.keys, self.blacklist)
 
     def __hash__(self):
-        return hash((self.metadata, self.vars, self.blacklist))
+        return hash((self.metadata, self.keys, self.blacklist))
 
     def __str__(self):
         from base64 import urlsafe_b64encode
@@ -517,10 +506,13 @@ class Signature(object):
         return urlsafe_b64encode(self.md5.digest()).rstrip("=")
 
     def hash(self):
+        """Return an integer version of the signature"""
         return int(self.md5.hexdigest(), 16)
 
     @property
     def md5(self):
+        """The underlying python 'md5' object"""
+
         value = self._md5
         if value is None:
             string = stable_repr(self.data)
@@ -529,50 +521,60 @@ class Signature(object):
 
     @property
     def data(self):
+        """The object containing the data which will be converted to a string and then hashed"""
+
         if self._data:
             return self._data
 
         def data_for_hash(var):
+            """Returns an iterator over the variable names and their values, including references"""
+
             valstr = self.metadata.getVar(var, False)
             if valstr is not None:
                 if not self.is_blacklisted(var):
-                    val = self.transform_blacklisted(value(var, self.metadata))
+                    value = self.transform_blacklisted(new_value(var, self.metadata))
 
-                    yield var, val
-                    if hasattr(val, "references"):
-                        for ref in val.references():
+                    yield var, value
+                    if hasattr(value, "references"):
+                        for ref in value.references():
                             for other in data_for_hash(ref):
                                 yield other
 
-        if not self.vars:
-            self.vars = [var for var in self.metadata.keys()
+        if not self.keys:
+            self.keys = [var for var in self.metadata.keys()
                          if self.metadata.getVarFlag(var, "task")]
-        data = self._data = dict(chain(*[data_for_hash(var) for var in self.vars]))
+        data = self._data = dict(chain(*[data_for_hash(var) for var in self.keys]))
         return data
 
-    def is_blacklisted(self, val):
+    def is_blacklisted(self, item):
+        """Determine if the supplied item is blacklisted"""
+
         if not self.blacklist:
             return
 
         for bl in self.blacklist:
-            if isinstance(val, Value):
-                if isinstance(val.value, basestring) and \
-                   fnmatchcase(val.value, bl):
-                    return val.value
-                elif all(isinstance(c, basestring) for c in val.components):
-                    valstr = str(val.components)
+            if isinstance(item, Value):
+                if isinstance(item.item, basestring) and \
+                   fnmatchcase(item.item, bl):
+                    return item.value
+                elif all(isinstance(c, basestring) for c in item.components):
+                    valstr = str(item.components)
                     if fnmatchcase(valstr, bl):
                         return valstr
-            elif isinstance(val, VariableRef):
-                if all(isinstance(c, basestring) for c in val.components):
-                    valstr = str(val.components)
+            elif isinstance(item, VariableRef):
+                if all(isinstance(c, basestring) for c in item.components):
+                    valstr = str(item.components)
                     if fnmatchcase(valstr, bl):
                         return valstr
-            elif isinstance(val, basestring):
-                if fnmatchcase(val, bl):
-                    return val
+            elif isinstance(item, basestring):
+                if fnmatchcase(item, bl):
+                    return item
 
     def transform_blacklisted(self, item):
+        """Transform the supplied item tree, changing all blacklisted objects
+        into their unexpanded forms.
+        """
+
         if not self.blacklist:
             return item
 
