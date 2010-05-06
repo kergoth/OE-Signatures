@@ -44,6 +44,7 @@ class Components(list):
     string, python snippet, or variable reference"""
 
     def __str__(self):
+        print("str(%s)" % stable_repr(self))
         return "".join(str(v) for v in self)
 
 
@@ -61,6 +62,7 @@ class VariableRef(object):
                                         repr(self.metadata))
 
     def __str__(self):
+        print("str(%s)" % stable_repr(self))
         name = str(self.components)
         return str(new_value(name, self.metadata))
 
@@ -98,6 +100,7 @@ class Value(object):
                                repr(self.metadata))
 
     def __str__(self):
+        print("str(%s)" % stable_repr(self))
         return str(self.components)
 
     def references(self):
@@ -400,6 +403,7 @@ class PythonSnippet(PythonValue):
     """Lazy evaluation of a python snippet"""
 
     def __str__(self):
+        print("str(%s)" % stable_repr(self))
         code = str(self.components)
         codeobj = compile(code.strip(), "<expansion>", "eval")
         try:

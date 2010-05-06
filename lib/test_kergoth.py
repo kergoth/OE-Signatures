@@ -62,6 +62,11 @@ class TestExpansions(unittest.TestCase):
         self.assertEqual(str(val), "${undefinedvar} meh")
         self.assertEqual(set(val.references()), set(["undefinedvar"]))
 
+    def test_direct_recursion(self):
+        self.d.setVar("FOO", "${FOO}")
+        value = kergoth.new_value("FOO", self.d)
+        self.assertRaises(kergoth.RecursionError, str, value)
+
 
 def test_memoize():
     d = bb.data.init()
