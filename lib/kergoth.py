@@ -446,22 +446,22 @@ def dedent_python(codestr):
 _value_cache = {}
 def new_value(variable, metadata):
     """Value creation factory for a variable in the metadata"""
-    cache_key = (variable, id(metadata))
+    strvalue = metadata.getVar(variable, False)
+    if strvalue is None:
+        return "${%s}" % variable
+
+    cache_key = (strvalue, id(metadata))
     value = _value_cache.get(cache_key)
     if value is not None:
         return value
 
-    value = metadata.getVar(variable, False)
-    if value is None:
-        value = "${%s}" % variable
-
     if metadata.getVarFlag(variable, "func"):
         if metadata.getVarFlag(variable, "python"):
-            value = PythonValue(dedent_python(value.expandtabs()), metadata)
+            value = PythonValue(dedent_python(strvalue.expandtabs()), metadata)
         else:
-            value = ShellValue(value, metadata)
+            value = ShellValue(strvalue, metadata)
     else:
-        value = Value(value, metadata)
+        value = Value(strvalue, metadata)
 
     _value_cache[cache_key] = value
     return value
