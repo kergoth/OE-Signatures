@@ -154,23 +154,23 @@ class TestSignatureGeneration(unittest.TestCase):
         self.d.setVar("theta", "alpha baz")
         self.d.setVarFlags("theta", {"func": True, "task": True})
         signature = kergoth.Signature(self.d)
-        self.assertEquals(signature.data_string, "{'alpha': ShellValue(Components('echo ', VariableRef(Components('TOPDIR')), '/foo \"$@\"')), 'beta': ShellValue(Components('test -f bar')), 'theta': ShellValue(Components('alpha baz'))}")
+        self.assertEquals(signature.data_string, "{'alpha': ShellValue(['echo ', VariableRef(['TOPDIR']), '/foo \"$@\"']), 'beta': ShellValue(['test -f bar']), 'theta': ShellValue(['alpha baz'])}")
 
     def test_signature_blacklisted(self):
         self.d["blacklistedvar"] = "blacklistedvalue"
         self.d["testbl"] = "${@5} foo ${blacklistedvar} bar"
         signature = kergoth.Signature(self.d, keys=["testbl"])
-        self.assertEqual(signature.data_string, "{'testbl': Value(Components(PythonSnippet(Components('5')), ' foo ', '${blacklistedvar}', ' bar'))}")
+        self.assertEqual(signature.data_string, "{'testbl': Value([PythonSnippet(['5']), ' foo ', '${blacklistedvar}', ' bar'])}")
 
     def test_signature_only_blacklisted(self):
         self.d["anotherval"] = "${blacklistedvar}"
         signature = kergoth.Signature(self.d, keys=["anotherval"])
-        self.assertEquals(signature.data_string, "{'anotherval': Value(Components('${blacklistedvar}'))}")
+        self.assertEquals(signature.data_string, "{'anotherval': Value(['${blacklistedvar}'])}")
 
     def test_signature_undefined(self):
         self.d["someval"] = "${undefinedvar} ${blacklistedvar} meh"
         signature = kergoth.Signature(self.d, keys=["someval"])
-        self.assertEquals(signature.data_string, "{'someval': Value(Components(VariableRef(Components('undefinedvar')), ' ', '${blacklistedvar}', ' meh'))}")
+        self.assertEquals(signature.data_string, "{'someval': Value([VariableRef(['undefinedvar']), ' ', '${blacklistedvar}', ' meh'])}")
 
 
 import pickle
