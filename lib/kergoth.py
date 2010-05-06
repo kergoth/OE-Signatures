@@ -43,6 +43,9 @@ class Components(list):
     str() on each component.  A given component is defined as being a
     string, python snippet, or variable reference"""
 
+    def __repr__(self):
+        return "Components(%s)" % ", ".join(repr(v) for v in self)
+
     def __str__(self):
         return "".join(str(v) for v in self)
 
@@ -470,6 +473,8 @@ def stable_repr(value):
                                   for key, value in sorted(value.iteritems()))
     elif isinstance(value, (set, frozenset)):
         return "%s(%s)" % (value.__class__.__name__, stable_repr(sorted(value)))
+    elif isinstance(value, Components):
+        return "Components(%s)" % ", ".join(stable_repr(value) for value in value)
     elif isinstance(value, list):
         return "[%s]" % ", ".join(stable_repr(value) for value in value)
     elif isinstance(value, tuple):
