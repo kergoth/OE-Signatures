@@ -21,7 +21,6 @@ bypass re-execution of the ast statements as well, simply letting 'dirty'
 state information flow through the variable references.
 
 Known Issues / Concerns:
-- No recursion checking yet.
 - It has to expand the shell and python code in order to scan it to extract
   the variable reference information.  In some cases, this means the expansion
   may be occurring sooner than it would normally expect to happen.  As an
@@ -58,7 +57,10 @@ Known Issues / Concerns:
     contexts.
 
 TODO:
-  - Add checking for recursion
+  - Add parse time checking for recursion if possible
+    - We have expansion time checking, but the earlier we catch these, the
+      better, if at all possible.  This will only be a possibility if the
+      variable reference is a literal string, of course.
   - May want to change the way Value works wrt the value and components
     properties.  Perhaps the real Value should always go from components, and
     provide a factory that does the parsing into the components.. hmm.

@@ -13,6 +13,16 @@ import bb.msg
 import bb.utils
 
 
+class RecursionError(RuntimeError):
+    def __init__(self, variable, path = None):
+        self.variable = variable
+        self.path = path
+
+    def __str__(self):
+        return "Recursive variable reference for %s via %s" % \
+               (self.variable, " -> ".join(stable_repr(v) for v in self.path))
+
+
 class Memoized(object):
     """Decorator that caches a function's return value each time it is called.
     If called later with the same arguments, the cached value is returned, and
@@ -44,8 +54,19 @@ class Components(list):
     string, python snippet, or variable reference"""
 
     def __str__(self):
-        print("str(%s)" % stable_repr(self))
-        return "".join(str(v) for v in self)
+        return self.resolve()
+
+    def _resolve(self, path = None):
+        for v in self:
+            if hasattr(v, "resolve"):
+                yield v.resolve(path)
+            else:
+                yield v
+
+    def resolve(self, path = None):
+        if path is None:
+            path = []
+        return "".join(self._resolve(path))
 
 
 class VariableRef(object):
@@ -62,9 +83,21 @@ class VariableRef(object):
                                         repr(self.metadata))
 
     def __str__(self):
-        print("str(%s)" % stable_repr(self))
-        name = str(self.components)
-        return str(new_value(name, self.metadata))
+        return self.resolve()
+
+    def resolve(self, path = None):
+        if path is None:
+            path = []
+
+        name = "".join(str(v) for v in self.components.resolve(path))
+        value = new_value(name, self.metadata)
+        if value in path:
+            raise RecursionError(name, path)
+
+        if hasattr(value, "resolve"):
+            return value.resolve(path)
+        else:
+            return value
 
 
 class Value(object):
@@ -100,8 +133,13 @@ class Value(object):
                                repr(self.metadata))
 
     def __str__(self):
-        print("str(%s)" % stable_repr(self))
-        return str(self.components)
+        return self.resolve()
+
+    def resolve(self, path = None):
+        if path is None:
+            path = []
+        path.append(self)
+        return self.components.resolve(path)
 
     def references(self):
         """Return an iterable of the variables this Value references"""
@@ -402,9 +440,8 @@ class PythonValue(Value):
 class PythonSnippet(PythonValue):
     """Lazy evaluation of a python snippet"""
 
-    def __str__(self):
-        print("str(%s)" % stable_repr(self))
-        code = str(self.components)
+    def resolve(self, path = None):
+        code = PythonValue.resolve(self, path)
         codeobj = compile(code.strip(), "<expansion>", "eval")
         try:
             value = str(bb.utils.better_eval(codeobj, {"d": self.metadata}))
@@ -413,7 +450,7 @@ class PythonSnippet(PythonValue):
                         "%s:%s while evaluating:\n%s" % (type(exc), exc,
                                                          code))
             return "<invalid>"
-        return str(Value(value, self.metadata))
+        return Value(value, self.metadata).resolve(path)
 
 
 from tokenize import generate_tokens, untokenize, INDENT, DEDENT
