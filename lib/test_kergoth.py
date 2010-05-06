@@ -63,6 +63,11 @@ class TestExpansions(unittest.TestCase):
         self.assertEqual(set(val.references()), set(["undefinedvar"]))
 
 
+def test_memoize():
+    d = bb.data.init()
+    d.setVar("FOO", "bar")
+    assert(kergoth.new_value("FOO", d) is kergoth.new_value("FOO", d))
+
 class TestContentsTracking(unittest.TestCase):
     def setUp(self):
         self.d = bb.data.init()

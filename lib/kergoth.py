@@ -440,21 +440,28 @@ def dedent_python(codestr):
         tokens.append((toknum, tokval))
     return untokenize(tokens)
 
-@Memoized
+_value_cache = {}
 def new_value(variable, metadata):
     """Value creation factory for a variable in the metadata"""
+    cache_key = (variable, id(metadata))
+    value = _value_cache.get(cache_key)
+    if value is not None:
+        return value
 
     value = metadata.getVar(variable, False)
     if value is None:
-        return "${%s}" % variable
+        value = "${%s}" % variable
 
     if metadata.getVarFlag(variable, "func"):
         if metadata.getVarFlag(variable, "python"):
-            return PythonValue(dedent_python(value.expandtabs()), metadata)
+            value = PythonValue(dedent_python(value.expandtabs()), metadata)
         else:
-            return ShellValue(value, metadata)
+            value = ShellValue(value, metadata)
     else:
-        return Value(value, metadata)
+        value = Value(value, metadata)
+
+    _value_cache[cache_key] = value
+    return value
 
 def stable_repr(value):
     """Produce a more stable 'repr' string for a value"""
