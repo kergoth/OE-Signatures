@@ -64,27 +64,33 @@ class TestExpansions(unittest.TestCase):
 
     def test_direct_recursion(self):
         self.d.setVar("FOO", "${FOO}")
-        value = kergoth.new_value("FOO", self.d)
-        self.assertRaises(kergoth.RecursionError, str, value)
+        self.assertRaises(kergoth.RecursionError, kergoth.new_value, "FOO", self.d)
 
     def test_indirect_recursion(self):
         self.d.setVar("FOO", "${BAR}")
         self.d.setVar("BAR", "${BAZ}")
         self.d.setVar("BAZ", "${FOO}")
-        value = kergoth.new_value("FOO", self.d)
-        self.assertRaises(kergoth.RecursionError, str, value)
+        self.assertRaises(kergoth.RecursionError, kergoth.new_value, "FOO", self.d)
 
     def test_recursion_exception(self):
         self.d.setVar("FOO", "${BAR}")
         self.d.setVar("BAR", "${BAZ}")
         self.d.setVar("BAZ", "${FOO}")
+        try:
+            value = kergoth.new_value("FOO", self.d)
+        except kergoth.RecursionError, exc:
+            self.assertEqual(exc.variable, "FOO")
+            self.assertEqual(list(exc.path), ["FOO", "BAR", "BAZ"])
+
+    def test_recursion_exception_expansion_time(self):
+        self.d.setVar("FOO", "${BAR}")
+        self.d.setVar("BAR", "${${@'FOO'}}")
         value = kergoth.new_value("FOO", self.d)
         try:
             str(value)
         except kergoth.RecursionError, exc:
             self.assertEqual(exc.variable, "FOO")
             self.assertTrue(kergoth.new_value("BAR", self.d) in exc.path)
-            self.assertTrue(kergoth.new_value("BAZ", self.d) in exc.path)
 
 
 def test_memoize():
@@ -117,10 +123,10 @@ class TestContentsTracking(unittest.TestCase):
     """
 
     def test_python(self):
-        self.d.setVar("somevar", self.pydata)
-        self.d.setVarFlags("somevar", {"func": True, "python": True})
+        self.d.setVar("FOO", self.pydata)
+        self.d.setVarFlags("FOO", {"func": True, "python": True})
 
-        value = kergoth.new_value("somevar", self.d)
+        value = kergoth.new_value("FOO", self.d)
         self.assertEquals(set(value.references()), set(["somevar", "bar", "something", "inexpand"]))
         self.assertEquals(set(value.calls), set(["test2", "a"]))
 
