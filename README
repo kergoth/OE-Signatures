@@ -20,6 +20,37 @@ is a step in the right direction for that also, but this would allow us to
 bypass re-execution of the ast statements as well, simply letting 'dirty'
 state information flow through the variable references.
 
+TODO:
+  - BitBake Integration
+    - Teach the Value objects to append/prepend to one another, as this is
+      necessary to handle the append/prepend operations from the files we
+      parse.
+    - Try constructing the Value objects directly from the AST statements and
+      storing it in the metadata rather than a string.
+    - Longer term: potentially construct non-string values based on flags.
+
+  - Cleanup
+    - Convert 'references' into a set rather than a method, let the parse
+      methods add to it as they go, rather than re-traversing the tree in the
+      references method.  This removes the need to add duplicates removal to
+      it, and simplifies the interface.
+    - Fix up the exception handling and bb.msg output
+    - Potentially, we could either move bits out of parse() to make them more
+      lazy, likely via properties, or we could move more into parse, to do as
+      much as we can up front, or somewhere in between.  Not sure what's best.
+      Also, doing this much called via the constructor could be bad, maybe we
+      should move that logic into a factory, since its more about how this
+      thing is created than anything else..
+    - Sanitize the property names amongst the Value implementations
+      - Rename 'references', as it is specifically references to variables in
+        the metadata.  This isn't the only type of reference we have anymore, as
+        we'll also be tracking calls to the methods in the methodpool.
+
+  - Performance
+    - Do some profiling, see where caching will be appropriate
+    - Check the memory impact of potentially using Value objects rather than
+      the strings in the datastore.
+
 Known Issues / Concerns:
 - It has to expand the shell and python code in order to scan it to extract
   the variable reference information.  In some cases, this means the expansion
@@ -31,6 +62,7 @@ Known Issues / Concerns:
 - Currently it pays zero attention to flags, as flags generally instruct
   bitbake in *how* to make something happen, not *what* will happen, for a
   given task.
+
 - ShellValue
   - The shell code which identifies defined functions and excludes them from
     the list of executed commands does not take into account context.  If one
@@ -42,10 +74,11 @@ Known Issues / Concerns:
     case autoconf-native in
     autoconf*)
     ;;
+
 - PythonValue:
   - Cannot determine what variable is being referenced when the argument to
-    the getVar is something other than a literal string.  As an example,
-    '"RDEPENDS_" + pkg' bites us.
+    the getVar is not a literal string.  As an example, '"RDEPENDS_" + pkg'
+    bites us.
   - Does not exclude locally imported functions from the list of executed
     functions.  If you run 'from collections import defaultdict', and run
     defaultdict, it will include defaultdict in the list of executed
@@ -55,24 +88,3 @@ Known Issues / Concerns:
     actually defined in this same block of code.  We should try to do so,
     though it will be difficult to be full proof without taking into account
     contexts.
-
-TODO:
-  - May want to change the way Value works wrt the value and components
-    properties.  Perhaps the real Value should always go from components, and
-    provide a factory that does the parsing into the components.. hmm.
-
-  - Cleanup
-    - Fix up the exception handling and bb.msg output
-    - In the overridden references methods, use a uniq() utility function or a
-      set to drop duplicates between the superclass references and the extra
-      references gathered by the class.
-    - Should the 'references' method become a property?
-    - Rename 'references', as it is specifically references to variables in
-      the metadata.  This isn't the only type of reference we have anymore, as
-      we'll also be tracking calls to the methods in the methodpool.
-    - Sanitize the property names amongst the Value implementations
-
-  - Performance
-    - Do some profiling, see where caching will be appropriate
-    - Check the memory impact of potentially using Value objects rather than
-      the strings in the datastore.
