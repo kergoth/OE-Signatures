@@ -19,8 +19,11 @@ class RecursionError(RuntimeError):
         self.path = path
 
     def __str__(self):
-        return "Recursive variable reference for %s via %s" % \
-               (self.variable, " -> ".join(stable_repr(v) for v in self.path))
+        msg = "Recursive variable reference for %s" % self.variable
+        if self.path:
+            msg += " via %s" % " -> ".join(stable_repr(v) for v in self.path)
+
+        return msg
 
 
 class Memoized(object):
