@@ -67,6 +67,25 @@ class TestExpansions(unittest.TestCase):
         value = kergoth.new_value("FOO", self.d)
         self.assertRaises(kergoth.RecursionError, str, value)
 
+    def test_indirect_recursion(self):
+        self.d.setVar("FOO", "${BAR}")
+        self.d.setVar("BAR", "${BAZ}")
+        self.d.setVar("BAZ", "${FOO}")
+        value = kergoth.new_value("FOO", self.d)
+        self.assertRaises(kergoth.RecursionError, str, value)
+
+    def test_recursion_exception(self):
+        self.d.setVar("FOO", "${BAR}")
+        self.d.setVar("BAR", "${BAZ}")
+        self.d.setVar("BAZ", "${FOO}")
+        value = kergoth.new_value("FOO", self.d)
+        try:
+            str(value)
+        except kergoth.RecursionError, exc:
+            self.assertEqual(exc.variable, "FOO")
+            self.assertTrue(kergoth.new_value("BAR", self.d) in exc.path)
+            self.assertTrue(kergoth.new_value("BAZ", self.d) in exc.path)
+
 
 def test_memoize():
     d = bb.data.init()
