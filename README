@@ -21,6 +21,12 @@ bypass re-execution of the ast statements as well, simply letting 'dirty'
 state information flow through the variable references.
 
 TODO:
+  - Add case statement support to pysh:
+    - Create a Case class for the ast
+    - Fix the case rules so they successfully match
+    - Make the case rules actually construct a Case object
+    - Add Case support to format_commands?
+
   - BitBake Integration
     - Teach the Value objects to append/prepend to one another, as this is
       necessary to handle the append/prepend operations from the files we
@@ -80,10 +86,6 @@ Known Issues / Concerns:
   - Cannot currently determine what variable (if a variable) is being
     referenced if it's a shell variable expansion.  As an example: 'for x in 1
     2 3; eval $x; done'
-  - The following breaks pysh:
-    case autoconf-native in
-    autoconf*)
-    ;;
 
 - PythonValue:
   - Cannot determine what variable is being referenced when the argument to
