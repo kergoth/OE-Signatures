@@ -30,10 +30,6 @@ TODO:
     - Longer term: potentially construct non-string values based on flags.
 
   - Cleanup
-    - Convert 'references' into a set rather than a method, let the parse
-      methods add to it as they go, rather than re-traversing the tree in the
-      references method.  This removes the need to add duplicates removal to
-      it, and simplifies the interface.
     - Fix up the exception handling and bb.msg output
     - Potentially, we could either move bits out of parse() to make them more
       lazy, likely via properties, or we could move more into parse, to do as
@@ -64,6 +60,13 @@ Known Issues / Concerns:
   given task.
 
 - ShellValue
+  - The variables which are flagged as 'export' are added to the references
+    for the ShellValue at object creation time currently.  This will be an
+    issue if we start constructing value objects in the AST as the statements
+    are evaluated, due to the order of operations.  Either references should
+    become a property for ShellValue which adds the current exports to the
+    internally held references, or we'll have to add the current exports in
+    the finalize step or something.
   - The shell code which identifies defined functions and excludes them from
     the list of executed commands does not take into account context.  If one
     defined a function in a subshell, it would still exclude it from the list.

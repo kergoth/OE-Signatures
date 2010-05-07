@@ -24,43 +24,43 @@ class TestExpansions(unittest.TestCase):
     def test_one_var(self):
         val = kergoth.Value("${foo}", self.d)
         self.assertEqual(str(val), "value of foo")
-        self.assertEqual(set(val.references()), set(["foo"]))
+        self.assertEqual(val.references, set(["foo"]))
 
     def test_indirect_one_var(self):
         val = kergoth.Value("${${foo}}", self.d)
         self.assertEqual(str(val), "value of 'value of foo'")
-        self.assertEqual(set(val.references()), set(["foo"]))
+        self.assertEqual(val.references, set(["foo"]))
 
     def test_indirect_and_another(self):
         val = kergoth.Value("${${foo}} ${bar}", self.d)
         self.assertEqual(str(val), "value of 'value of foo' value of bar")
-        self.assertEqual(set(val.references()), set(["foo", "bar"]))
+        self.assertEqual(val.references, set(["foo", "bar"]))
 
     def test_python_snippet(self):
         val = kergoth.Value("${@5*12}", self.d)
         self.assertEqual(str(val), "60")
-        self.assertFalse(set(val.references()))
+        self.assertFalse(val.references)
 
     def test_expand_in_python_snippet(self):
         val = kergoth.Value("${@'boo ' + '${foo}'}", self.d)
         self.assertEqual(str(val), "boo value of foo")
-        self.assertEqual(set(val.references()), set(["foo"]))
+        self.assertEqual(val.references, set(["foo"]))
 
     def test_python_snippet_getvar(self):
         val = kergoth.Value("${@d.getVar('foo', True) + ' ${bar}'}", self.d)
         self.assertEqual(str(val), "value of foo value of bar")
-        self.assertEqual(set(val.references()), set(["foo", "bar"]))
+        self.assertEqual(val.references, set(["foo", "bar"]))
 
     def test_value_containing_value(self):
         otherval = kergoth.Value("${@d.getVar('foo', True) + ' ${bar}'}", self.d)
         val = kergoth.Value(kergoth.Components([otherval, " test"]), self.d)
         self.assertEqual(str(val), "value of foo value of bar test")
-        self.assertEqual(set(val.references()), set(["foo", "bar"]))
+        self.assertEqual(val.references, set(["foo", "bar"]))
 
     def test_reference_undefined_var(self):
         val = kergoth.Value("${undefinedvar} meh", self.d)
         self.assertEqual(str(val), "${undefinedvar} meh")
-        self.assertEqual(set(val.references()), set(["undefinedvar"]))
+        self.assertEqual(val.references, set(["undefinedvar"]))
 
     def test_direct_recursion(self):
         self.d.setVar("FOO", "${FOO}")
@@ -127,8 +127,8 @@ class TestContentsTracking(unittest.TestCase):
         self.d.setVarFlags("FOO", {"func": True, "python": True})
 
         value = kergoth.new_value("FOO", self.d)
-        self.assertEquals(set(value.references()), set(["somevar", "bar", "something", "inexpand"]))
-        self.assertEquals(set(value.calls), set(["test2", "a"]))
+        self.assertEquals(value.references, set(["somevar", "bar", "something", "inexpand"]))
+        self.assertEquals(value.calls, set(["test2", "a"]))
 
     shelldata = """
         foo () {
@@ -169,7 +169,7 @@ class TestContentsTracking(unittest.TestCase):
         self.d.setVarFlag("inverted", "func", True)
 
         shellval = kergoth.ShellValue(self.shelldata, self.d)
-        self.assertEquals(set(shellval.references()), set(["somevar", "inverted"]))
+        self.assertEquals(shellval.references, set(["somevar", "inverted"]))
 
 class TestSignatureGeneration(unittest.TestCase):
     def setUp(self):

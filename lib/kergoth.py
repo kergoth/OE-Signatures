@@ -118,7 +118,19 @@ class Value(object):
             self.value = value
             self.components = Components()
         self.metadata = metadata
+        self.references = set()
         self.parse()
+        self.update_references(self)
+
+    def update_references(self, value):
+        for item in value.components:
+            if isinstance(item, VariableRef):
+                if all(isinstance(x, basestring) for x in item.components):
+                    self.references.add("".join(item.components))
+                else:
+                    self.update_references(item)
+            elif isinstance(item, Value):
+                self.references.update(item.references)
 
     def __eq__(self, other):
         return isinstance(other, type(self)) and \
@@ -143,25 +155,6 @@ class Value(object):
             path = []
         path.append(self)
         return self.components.resolve(path)
-
-    def references(self):
-        """Return an iterable of the variables this Value references"""
-
-        def search(value):
-            """Recursively search a value to get its references"""
-
-            for item in value.components:
-                if isinstance(item, VariableRef) and \
-                   all(isinstance(x, basestring) for x in item.components):
-                    yield str(item.components)
-
-                if hasattr(item, "references"):
-                    for ref in item.references():
-                        yield ref
-                elif hasattr(item, "components"):
-                    for otheritem in search(item):
-                        yield otheritem
-        return search(self)
 
     def parse(self):
         """Parse a value from the OE metadata into a Components object"""
@@ -219,6 +212,10 @@ class ShellValue(Value):
     def parse(self):
         Value.parse(self)
         self.external_execs = self.parse_shell(str(self.components))
+        for var in self.metadata.keys():
+            if self.metadata.getVarFlag(var, "export"):
+                self.references.add(var)
+        self.references.update(self.external_execs)
 
     def parse_shell(self, value):
         """Parse the supplied shell code in a string, returning the external
@@ -304,19 +301,6 @@ class ShellValue(Value):
                 else:
                     self.execs.add(cmd)
 
-    def references(self):
-        refs = Value.references(self)
-        for ref in refs:
-            yield ref
-
-        for var in self.metadata.keys():
-            if self.metadata.getVarFlag(var, "export"):
-                yield var
-
-        for func in self.external_execs:
-            if self.metadata.getVar(func, False) is not None:
-                yield func
-
 
 class PythonValue(Value):
     """Represents a block of python code, initialized from a string.  First
@@ -400,8 +384,7 @@ class PythonValue(Value):
             elif self.compare_name(self.expands, node.func):
                 if isinstance(node.args[0], ast.Str):
                     value = Value(node.args[0].s, bb.data.init())
-                    for var in value.references():
-                        self.var_references.add(var)
+                    self.var_references.update(value.references)
                 elif isinstance(node.args[0], ast.Call) and \
                      self.compare_name(self.getvars, node.args[0].func):
                     pass
@@ -412,7 +395,6 @@ class PythonValue(Value):
 
     def __init__(self, value, metadata):
         self.visitor = self.ValueVisitor()
-        self.var_references = None
         self.calls = None
 
         Value.__init__(self, value, metadata)
@@ -429,16 +411,8 @@ class PythonValue(Value):
         else:
             self.visitor.visit(code)
 
-        self.var_references = self.visitor.var_references
+        self.references.update(self.visitor.var_references)
         self.calls = self.visitor.direct_func_calls
-
-    def references(self):
-        refs = Value.references(self)
-        for ref in refs:
-            yield ref
-
-        for ref in self.var_references:
-            yield ref
 
 class PythonSnippet(PythonValue):
     """Lazy evaluation of a python snippet"""
@@ -506,7 +480,7 @@ def _new_value(variable, metadata, path):
         value = Value(strvalue, metadata)
 
     path.append(variable)
-    for ref in value.references():
+    for ref in value.references:
         if ref in path:
             raise RecursionError(path[0], path)
         _new_value(ref, metadata, path)
@@ -613,7 +587,7 @@ class Signature(object):
                     value = self.transform_blacklisted(new_value(key, self.metadata))
 
                     yield key, value
-                    for ref in value.references():
+                    for ref in value.references:
                         for other in data_for_hash(ref):
                             yield other
 
