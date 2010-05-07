@@ -57,10 +57,6 @@ Known Issues / Concerns:
     contexts.
 
 TODO:
-  - Add parse time checking for recursion if possible
-    - We have expansion time checking, but the earlier we catch these, the
-      better, if at all possible.  This will only be a possibility if the
-      variable reference is a literal string, of course.
   - May want to change the way Value works wrt the value and components
     properties.  Perhaps the real Value should always go from components, and
     provide a factory that does the parsing into the components.. hmm.

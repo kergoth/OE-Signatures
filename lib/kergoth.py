@@ -485,8 +485,9 @@ def dedent_python(codestr):
     return untokenize(tokens)
 
 _value_cache = {}
-def new_value(variable, metadata):
-    """Value creation factory for a variable in the metadata"""
+def _new_value(variable, metadata, path):
+    """Implementation of value creation factory"""
+
     strvalue = metadata.getVar(variable, False)
     if strvalue is None:
         return "${%s}" % variable
@@ -504,8 +505,20 @@ def new_value(variable, metadata):
     else:
         value = Value(strvalue, metadata)
 
+    path.append(variable)
+    for ref in value.references():
+        if ref in path:
+            raise RecursionError(variable, path)
+        _new_value(ref, metadata, path)
+    path.pop()
+
     _value_cache[cache_key] = value
     return value
+
+def new_value(variable, metadata):
+    """Value creation factory for a variable in the metadata"""
+
+    return _new_value(variable, metadata, [])
 
 def stable_repr(value):
     """Produce a more stable 'repr' string for a value"""
