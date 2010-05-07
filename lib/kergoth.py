@@ -12,6 +12,7 @@ from pysh import pyshyacc, pyshlex, sherrors
 import bb.msg
 import bb.utils
 
+from pysh.sherrors import ShellSyntaxError
 
 class RecursionError(RuntimeError):
     def __init__(self, variable, path = None):
@@ -222,12 +223,7 @@ class ShellValue(Value):
         commands it executes.
         """
 
-        try:
-            tokens, _ = pyshyacc.parse(value, True, False)
-        except sherrors.ShellSyntaxError:
-            bb.msg.note(1, None, "Shell syntax error when parsing:\n%s" % value)
-            return ()
-
+        tokens, _ = pyshyacc.parse(value, eof=True, debug=False)
         for token in tokens:
             self.process_tokens(token)
         cmds = set(cmd for cmd in self.execs
