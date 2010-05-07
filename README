@@ -46,6 +46,13 @@ TODO:
     - Do some profiling, see where caching will be appropriate
     - Check the memory impact of potentially using Value objects rather than
       the strings in the datastore.
+    - In addition to caching/memoization, once we add dirty state tracking,
+      it'd be possible to pre-generate the expanded version, to reduce the
+      amount of work at str/getVar time.
+    - May want to add a tree simplification phase.  If a Value contains only
+      one component, the wrapping Value could go away in favor of the
+      underlying object, reducing the amount of tree traversal necessary to do
+      the resolve/expansion operation.
 
 Known Issues / Concerns:
 - It has to expand the shell and python code in order to scan it to extract
