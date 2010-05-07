@@ -59,6 +59,9 @@ TODO:
       one component, the wrapping Value could go away in favor of the
       underlying object, reducing the amount of tree traversal necessary to do
       the resolve/expansion operation.
+      - Tested a first attempt at this, results in the recursion checks
+        failing to do their jobs for some reason.  Needs further
+        investigation.
 
 Known Issues / Concerns:
 - It has to expand the shell and python code in order to scan it to extract
