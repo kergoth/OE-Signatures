@@ -23,12 +23,22 @@ state information flow through the variable references.
 TODO
 ----
 
-- Add case statement support to pysh
+- Top Priority Tasks
 
-  - Create a Case class for the ast
-  - Fix the case rules so they successfully match
-  - Make the case rules actually construct a Case object
-  - Add Case support to format_commands?
+  - Revamp the exception handling
+  - Revamp the logging / bb.msg usage
+  - Add support for a variable flag which indicates more explicitly which
+    variables are being referenced by this variable.  This should allow us to
+    work around the current issues where the referenced variable name is
+    constructed programmatically.
+  - Add case statement support to pysh
+
+    - Create a Case class for the ast
+    - Fix the case rules so they successfully match
+    - Make the case rules actually construct a Case object
+    - Add Case support to format_commands?
+
+  - Do extensive profiling to improve performance
 
 - BitBake Integration
 
@@ -45,7 +55,6 @@ TODO
 
 - Cleanup
 
-  - Fix up the exception handling and bb.msg output
   - Potentially, we could either move bits out of parse() to make them more
     lazy, likely via properties, or we could move more into parse, to do as
     much as we can up front, or somewhere in between.  Not sure what's best.
@@ -60,7 +69,6 @@ TODO
 
 - Performance
 
-  - Do some profiling, see where caching will be appropriate
   - Check the memory impact of potentially using Value objects rather than
     the strings in the datastore.
   - In addition to caching/memoization, once we add dirty state tracking,
@@ -119,3 +127,5 @@ Known Issues / Concerns
     actually defined in this same block of code.  We should try to do so,
     though it will be difficult to be full proof without taking into account
     contexts.
+
+..  vim: set et fenc=utf-8 sts=2 sw=2 :
