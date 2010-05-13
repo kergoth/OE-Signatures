@@ -23,57 +23,57 @@ state information flow through the variable references.
 TODO
 ----
 
-  - Add case statement support to pysh
+- Add case statement support to pysh
 
-    - Create a Case class for the ast
-    - Fix the case rules so they successfully match
-    - Make the case rules actually construct a Case object
-    - Add Case support to format_commands?
+  - Create a Case class for the ast
+  - Fix the case rules so they successfully match
+  - Make the case rules actually construct a Case object
+  - Add Case support to format_commands?
 
-  - BitBake Integration
+- BitBake Integration
 
-    - Teach the Value objects to append/prepend to one another, as this is
-      necessary to handle the append/prepend operations from the files we
-      parse.
-    - Try constructing the Value objects directly from the AST statements and
-      storing it in the metadata rather than a string.
-    - Determine how to handle Value objects with regard to the COW metadata
-      objects.  Should getvar return a new value bound to the current object,
-      or should the original know something about the layering?  I expect the
-      former, but needs thought.
-    - Longer term: potentially construct non-string values based on flags.
+  - Teach the Value objects to append/prepend to one another, as this is
+    necessary to handle the append/prepend operations from the files we
+    parse.
+  - Try constructing the Value objects directly from the AST statements and
+    storing it in the metadata rather than a string.
+  - Determine how to handle Value objects with regard to the COW metadata
+    objects.  Should getvar return a new value bound to the current object,
+    or should the original know something about the layering?  I expect the
+    former, but needs thought.
+  - Longer term: potentially construct non-string values based on flags.
 
-  - Cleanup
+- Cleanup
 
-    - Fix up the exception handling and bb.msg output
-    - Potentially, we could either move bits out of parse() to make them more
-      lazy, likely via properties, or we could move more into parse, to do as
-      much as we can up front, or somewhere in between.  Not sure what's best.
-      Also, doing this much called via the constructor could be bad, maybe we
-      should move that logic into a factory, since its more about how this
-      thing is created than anything else..
-    - Sanitize the property names amongst the Value implementations
+  - Fix up the exception handling and bb.msg output
+  - Potentially, we could either move bits out of parse() to make them more
+    lazy, likely via properties, or we could move more into parse, to do as
+    much as we can up front, or somewhere in between.  Not sure what's best.
+    Also, doing this much called via the constructor could be bad, maybe we
+    should move that logic into a factory, since its more about how this
+    thing is created than anything else..
+  - Sanitize the property names amongst the Value implementations
 
-      - Rename 'references', as it is specifically references to variables in
-        the metadata.  This isn't the only type of reference we have anymore, as
-        we'll also be tracking calls to the methods in the methodpool.
+    - Rename 'references', as it is specifically references to variables in
+      the metadata.  This isn't the only type of reference we have anymore, as
+      we'll also be tracking calls to the methods in the methodpool.
 
-  - Performance
+- Performance
 
-    - Do some profiling, see where caching will be appropriate
-    - Check the memory impact of potentially using Value objects rather than
-      the strings in the datastore.
-    - In addition to caching/memoization, once we add dirty state tracking,
-      it'd be possible to pre-generate the expanded version, to reduce the
-      amount of work at str/getVar time.
-    - May want to add a tree simplification phase.  If a Value contains only
-      one component, the wrapping Value could go away in favor of the
-      underlying object, reducing the amount of tree traversal necessary to do
-      the resolve/expansion operation.
+  - Do some profiling, see where caching will be appropriate
+  - Check the memory impact of potentially using Value objects rather than
+    the strings in the datastore.
+  - In addition to caching/memoization, once we add dirty state tracking,
+    it'd be possible to pre-generate the expanded version, to reduce the
+    amount of work at str/getVar time.
+  - May want to add a tree simplification phase.  If a Value contains only
+    one component, the wrapping Value could go away in favor of the
+    underlying object, reducing the amount of tree traversal necessary to do
+    the resolve/expansion operation.
 
-      - Tested a first attempt at this, results in the recursion checks
-        failing to do their jobs for some reason.  Needs further
-        investigation.
+    - Tested a first attempt at this, results in the recursion checks
+      failing to do their jobs for some reason.  Needs further
+      investigation.
 
 Known Issues / Concerns
 -----------------------
