@@ -26,12 +26,31 @@ TODO
 - Top Priority Tasks
 
   - Revamp the exception handling
-  - Revamp the logging / bb.msg usage
+
+    - Current behavior
+
+      - Construction of a Value may raise RecursionError.
+      - Construction of a ShellValue may raise ShellSyntaxError or
+        NotImplementedError.
+      - Construction of a PythonValue may result in a syntax or runtime error, this
+        exception is not currently passed up.
+
+      - Resolving a PythonSnippet may encounter a python syntax or runtime error,
+        this is not currently passed up.
+      - Resolving a Value may raise RecursionError.
+        Naturally, resolving a Value may also raise the Value subclass resolve time
+        exceptions, since a Value has Components, and Components can include any
+        existing Value.
+
+  - Revamp the logging & bb.msg usage
   - Add support for a variable flag which indicates more explicitly which
     variables are being referenced by this variable.  This should allow us to
     work around the current issues where the referenced variable name is
     constructed programmatically.
-  - Add case statement support to pysh
+  - Add case statement support to pysh.  I thought about possibly teaching the
+    parser to recover, but to exclude the contents of the case statement, it
+    would have to be able to identify its beginning and end, and we might as
+    well just parse the damn thing properly.
 
     - Create a Case class for the ast
     - Fix the case rules so they successfully match

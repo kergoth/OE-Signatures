@@ -1,5 +1,21 @@
 #!/usr/bin/env python2.6
-"""Staging area for OE python bits for kergoth"""
+"""Development of variable reference tracking and signature generation
+
+Notes:
+
+- Construction of a Value may raise RecursionError.
+- Construction of a ShellValue may raise ShellSyntaxError or
+  NotImplementedError.
+- Construction of a PythonValue may result in a syntax or runtime error, this
+  exception is not currently passed up.
+
+- Resolving a PythonSnippet may encounter a python syntax or runtime error,
+  this is not currently passed up.
+- Resolving a Value may raise RecursionError.
+  Naturally, resolving a Value may also raise the other *Value resolve time
+  exceptions, since a Value has Components, and Components can include any
+  existing Value.
+"""
 
 import re
 import codegen
@@ -202,6 +218,8 @@ class ShellValue(Value):
     parses the string into a components object to gather information about
     regular variable references, then parses the resulting expanded shell code
     to extract calls to other shell functions in the metadata.
+
+    May raise: NotImplementedError, ShellSyntaxError
     """
 
     def __init__(self, value, metadata):
