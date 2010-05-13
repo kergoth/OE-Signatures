@@ -1,5 +1,5 @@
 OE Signatures
--------------
+=============
 
 This bitbake layer (OpenEmbedded Overlay) exists to test some code which I've
 thrown together.  This code changes the way variables are expanded, to allow
@@ -20,14 +20,18 @@ is a step in the right direction for that also, but this would allow us to
 bypass re-execution of the ast statements as well, simply letting 'dirty'
 state information flow through the variable references.
 
-TODO:
-  - Add case statement support to pysh:
+TODO
+----
+
+  - Add case statement support to pysh
+
     - Create a Case class for the ast
     - Fix the case rules so they successfully match
     - Make the case rules actually construct a Case object
     - Add Case support to format_commands?
 
   - BitBake Integration
+
     - Teach the Value objects to append/prepend to one another, as this is
       necessary to handle the append/prepend operations from the files we
       parse.
@@ -40,6 +44,7 @@ TODO:
     - Longer term: potentially construct non-string values based on flags.
 
   - Cleanup
+
     - Fix up the exception handling and bb.msg output
     - Potentially, we could either move bits out of parse() to make them more
       lazy, likely via properties, or we could move more into parse, to do as
@@ -48,11 +53,13 @@ TODO:
       should move that logic into a factory, since its more about how this
       thing is created than anything else..
     - Sanitize the property names amongst the Value implementations
+
       - Rename 'references', as it is specifically references to variables in
         the metadata.  This isn't the only type of reference we have anymore, as
         we'll also be tracking calls to the methods in the methodpool.
 
   - Performance
+
     - Do some profiling, see where caching will be appropriate
     - Check the memory impact of potentially using Value objects rather than
       the strings in the datastore.
@@ -63,11 +70,14 @@ TODO:
       one component, the wrapping Value could go away in favor of the
       underlying object, reducing the amount of tree traversal necessary to do
       the resolve/expansion operation.
+
       - Tested a first attempt at this, results in the recursion checks
         failing to do their jobs for some reason.  Needs further
         investigation.
 
-Known Issues / Concerns:
+Known Issues / Concerns
+-----------------------
+
 - It has to expand the shell and python code in order to scan it to extract
   the variable reference information.  In some cases, this means the expansion
   may be occurring sooner than it would normally expect to happen.  As an
@@ -80,6 +90,7 @@ Known Issues / Concerns:
   given task.
 
 - ShellValue
+
   - The variables which are flagged as 'export' are added to the references
     for the ShellValue at object creation time currently.  This will be an
     issue if we start constructing value objects in the AST as the statements
@@ -94,7 +105,8 @@ Known Issues / Concerns:
     referenced if it's a shell variable expansion.  As an example: 'for x in 1
     2 3; eval $x; done'
 
-- PythonValue:
+- PythonValue
+
   - Cannot determine what variable is being referenced when the argument to
     the getVar is not a literal string.  As an example, '"RDEPENDS_" + pkg'
     bites us.
