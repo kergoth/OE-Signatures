@@ -33,6 +33,10 @@ TODO:
       parse.
     - Try constructing the Value objects directly from the AST statements and
       storing it in the metadata rather than a string.
+    - Determine how to handle Value objects with regard to the COW metadata
+      objects.  Should getvar return a new value bound to the current object,
+      or should the original know something about the layering?  I expect the
+      former, but needs thought.
     - Longer term: potentially construct non-string values based on flags.
 
   - Cleanup
