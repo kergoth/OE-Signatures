@@ -28,7 +28,7 @@ TODO
   - Revamp the exception handling
 
     - Wrap python syntax & runtime errors in a PythonSnippet in our own
-      exception. *DONE*
+      exception. **[DONE]**
     - Enhance the PythonExpansionError handling - catch it at each level and
       re-raise with itself and the node that actually raised the exception as
       arguments, so that at toplevel we'll have the root of the value tree.
