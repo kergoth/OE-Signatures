@@ -26,6 +26,7 @@ TODO
 - Top Priority Tasks
 
   - Revamp the exception handling
+
     - Wrap python syntax & runtime errors in a PythonSnippet in our own
       exception. *DONE*
     - Enhance the PythonExpansionError handling - catch it at each level and
