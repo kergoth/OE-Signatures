@@ -404,12 +404,8 @@ class PythonValue(Value):
     def parse(self):
         Value.parse(self)
         value = str(self.components)
-        try:
-            code = compile(value, "<string>", "exec", ast.PyCF_ONLY_AST)
-        except SyntaxError, exc:
-            raise PythonExpansionError(self, exc)
-        else:
-            self.visitor.visit(code)
+        code = compile(value, "<string>", "exec", ast.PyCF_ONLY_AST)
+        self.visitor.visit(code)
 
         self.references.update(self.visitor.var_references)
         self.calls = self.visitor.direct_func_calls
@@ -419,8 +415,8 @@ class PythonSnippet(PythonValue):
 
     def resolve(self, path = None):
         code = PythonValue.resolve(self, path)
+        codeobj = compile(code.strip(), "<expansion>", "eval")
         try:
-            codeobj = compile(code.strip(), "<expansion>", "eval")
             value = str(bb.utils.better_eval(codeobj, {"d": self.metadata}))
         except Exception, exc:
             raise PythonExpansionError(self, exc)

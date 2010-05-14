@@ -20,37 +20,35 @@ is a step in the right direction for that also, but this would allow us to
 bypass re-execution of the ast statements as well, simply letting 'dirty'
 state information flow through the variable references.
 
+
+Notes About Exception Handling
+------------------------------
+
+- Construction of a Value may raise RecursionError.
+- Construction of a ShellValue may raise ShellSyntaxError or
+  NotImplementedError.
+- Construction of a PythonValue may raise PythonExpansionError.
+
+- Resolving a PythonSnippet may raise PythonExpansionError.
+- Resolving a Value (and its subclasses) may raise RecursionError.
+
+Recommendations:
+
+- When constructing a Value, catch RecursionError and SyntaxError (if there may
+  be a python snippet).
+- When constructing a ShellValue, catch RecursionError, ShellSyntaxError, and
+  NotImplementedError.
+- When constructing a PythonValue, catch SyntaxError.
+
+- When resolving (or converting to a string), catch RecursionError,
+  SyntaxError, and PythonExpansionError.
+
+
 TODO
 ----
 
 - Top Priority Tasks
 
-  - Revamp the exception handling
-
-    - Wrap python syntax & runtime errors in a PythonSnippet in our own
-      exception. **[DONE]**
-    - Enhance the PythonExpansionError handling - catch it at each level and
-      re-raise with itself and the node that actually raised the exception as
-      arguments, so that at toplevel we'll have the root of the value tree.
-      In this way, we'll be able to see the exact flow of variable expansions
-      that led up to the failure, to give us more context.
-
-    - Current behavior
-
-      - Construction of a Value may raise RecursionError.
-      - Construction of a ShellValue may raise ShellSyntaxError or
-        NotImplementedError.
-      - Construction of a PythonValue may raise SyntaxError.  This exception
-        is currently not passed up.
-
-      - Resolving a PythonSnippet may encounter a python syntax or runtime error,
-        this is not currently passed up.
-      - Resolving a Value may raise RecursionError.
-        Naturally, resolving a Value may also raise the Value subclass resolve time
-        exceptions, since a Value has Components, and Components can include any
-        existing Value.
-
-  - Revamp the logging & bb.msg usage
   - Add support for a variable flag which indicates more explicitly which
     variables are being referenced by this variable.  This should allow us to
     work around the current issues where the referenced variable name is
@@ -66,6 +64,14 @@ TODO
     - Add Case support to format_commands?
 
   - Do extensive profiling to improve performance
+
+- General
+
+    - Enhance the PythonExpansionError handling - catch it at each level and
+      re-raise with itself and the node that actually raised the exception as
+      arguments, so that at toplevel we'll have the root of the value tree.
+      In this way, we'll be able to see the exact flow of variable expansions
+      that led up to the failure, to give us more context.
 
 - BitBake Integration
 
