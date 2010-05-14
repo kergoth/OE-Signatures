@@ -40,18 +40,25 @@ TODO
 
 - Top Priority Tasks
 
-  - The path information for the runtime recursion check appears to leave out
-    the top element, at least in some cases.
-  - Fix issue with the runtime recursion checking -- it isn't popping elements
-    as it returns from the tree traversal.
-  - Being bitten by an inexplicable RecursionError in attempting to generate a
-    signature.
+  - Determine the cause of what seems to be a signature generation hang when
+    running against OE metadata.
+  - Cache blacklist transformations, to avoid duplication of effort.
+  - Avoid running data_for_hash on the same key more than once.
+  - Simplify blacklist transformation.
   - Add support for a variable flag which indicates more explicitly which
     variables are being referenced by this variable.  This should allow us to
     work around the current issues where the referenced variable name is
     constructed programmatically.
 
   - Do extensive profiling to improve performance
+
+- General
+
+  - The path information for the runtime recursion check appears to leave out
+    the top element, at least in some cases.
+  - Create generally useful Visitor/Transformer classes for a Value tree, and
+    consider using them for the resolve process, rather than doing it so
+    implicitly in code scattered across the classes.
 
 - BitBake Integration
 
