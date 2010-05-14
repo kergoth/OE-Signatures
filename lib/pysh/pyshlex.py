@@ -791,7 +791,7 @@ class Lexer:
                         pass
                     else:
                         self._type = reserved
-                        if reserved=='For':
+                        if reserved in ('For', 'Case'):
                             self._for_count = 0                    
                 elif are_digits(self._token) and delim in ('<', '>'):
                     #Detect IO_NUMBER
