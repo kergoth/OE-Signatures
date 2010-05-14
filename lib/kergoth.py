@@ -5,6 +5,7 @@ import re
 import codegen
 import ast
 import hashlib
+import pickle
 from fnmatch import fnmatchcase
 from itertools import chain
 from collections import deque
@@ -48,15 +49,12 @@ class Memoized(object):
         self.cache = {}
 
     def __call__(self, *args):
+        key = pickle.dumps(args)
         try:
-            return self.cache[args]
+            return self.cache[key]
         except KeyError:
-            self.cache[args] = value = self.func(*args)
+            self.cache[key] = value = self.func(*args)
             return value
-        except TypeError:
-            # uncachable -- for instance, passing a list as an argument.
-            # Better to not cache than to blow up entirely.
-            return self.func(*args)
 
     def __repr__(self):
         """Return the function's docstring."""
