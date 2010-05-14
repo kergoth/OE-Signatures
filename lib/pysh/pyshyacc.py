@@ -93,6 +93,11 @@ class IfCond:
         self.cond = list(cond)
         self.if_cmds = if_cmds
         self.else_cmds = else_cmds
+
+class Case:
+    def __init__(self, name, items):
+        self.name = name
+        self.items = items
         
 class SubShell:
     def __init__(self, cmds):
@@ -187,6 +192,7 @@ def p_command(p):
                     'for_clause',
                     'while_clause',
                     'until_clause',
+                    'case_clause',
                     'if_clause',
                     'function_definition',
                     'subshell',
@@ -282,32 +288,57 @@ def p_case_clause(p):
     """case_clause : Case TOKEN linebreak in linebreak case_list    Esac
                    | Case TOKEN linebreak in linebreak case_list_ns Esac
                    | Case TOKEN linebreak in linebreak              Esac"""
-       
+    if len(p) < 8:
+        items = []
+    else:
+        items = p[6][1:]
+    name = p[2]
+    p[0] = ('case_clause', Case(name, [c[1] for c in items]))
        
 def p_case_list_ns(p):
     """case_list_ns : case_list case_item_ns
                     |           case_item_ns"""
-      
+    p_case_list(p)
       
 def p_case_list(p):
     """case_list : case_list case_item
                  |           case_item"""
+    if len(p)==2:
+        p[0] = ['case_list', p[1]]
+    else:
+        p[0] = p[1] + [p[2]]
         
 def p_case_item_ns(p):
-    """case_item_ns :         pattern RPARENS linebreak
+    """case_item_ns :         pattern RPARENS               linebreak
                     |         pattern RPARENS compound_list linebreak
                     | LPARENS pattern RPARENS               linebreak
                     | LPARENS pattern RPARENS compound_list linebreak"""
+    p_case_item(p)
                  
 def p_case_item(p):
     """case_item :         pattern RPARENS linebreak     DSEMI linebreak
                  |         pattern RPARENS compound_list DSEMI linebreak
                  | LPARENS pattern RPARENS linebreak     DSEMI linebreak
                  | LPARENS pattern RPARENS compound_list DSEMI linebreak"""
+    if len(p) < 7:
+        name = p[1][1:]
+    else:
+        name = p[2][1:]
+
+    try:
+        cmds = get_production(p[1:], "compound_list")[1:]
+    except KeyError:
+        cmds = []
+
+    p[0] = ('case_item', (name, cmds))
                  
 def p_pattern(p):
     """pattern :              TOKEN
                | pattern PIPE TOKEN"""
+    if len(p)==2:
+        p[0] = ['pattern', ('TOKEN', p[1])]
+    else:
+        p[0] = p[1] + [('TOKEN', p[2])]
 
 def p_maybe_if_word(p):
     # Rearrange 'If' priority wrt TOKEN. See p_if_word

@@ -252,6 +252,14 @@ class ShellValue(Value):
             self.funcdefs.add(value.name)
             return [value.body], None
 
+        def case_clause(value):
+            # Element 0 of each item in the case is the list of patterns, and
+            # Element 1 of each item in the case is the list of commands to be
+            # executed when that pattern matches.
+            words = chain(*[item[0] for item in value.items])
+            cmds  = chain(*[item[1] for item in value.items])
+            return cmds, words
+
         token_handlers = {
             "and_or": lambda x: ((x.left, x.right), None),
             "async": lambda x: ([x], None),
@@ -265,6 +273,7 @@ class ShellValue(Value):
             "subshell": lambda x: (x.cmds, None),
             "while_clause": lambda x: (chain(x.condition, x.cmds), None),
             "until_clause": lambda x: (chain(x.condition, x.cmds), None),
+            "case_clause": case_clause,
         }
 
         for token in tokens:

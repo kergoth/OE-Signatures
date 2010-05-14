@@ -190,10 +190,22 @@ class TestContentsTracking(unittest.TestCase):
         self.d.setVarFlag("inverted", "func", True)
 
         shellval = kergoth.ShellValue(self.shelldata, self.d)
-        self.assertEquals(shellval.references, set(["somevar", "inverted"]))
+        self.assertEquals(shellval.references, set(["bar", "echo", "heh", "moo", "true", "false", "test", "aiee", "inverted", "somevar"]))
 
     def test_shell_until(self):
         shellval = kergoth.ShellValue("until false; do echo true; done", self.d)
+        self.assertEquals(shellval.references, set(["false", "echo"]))
+
+    def test_shell_case(self):
+        script = """
+case $foo in
+    *)
+        bar
+        ;;
+esac
+        """
+        shellval = kergoth.ShellValue(script, self.d)
+        self.assertEquals(shellval.references, set(["bar"]))
 
 class TestSignatureGeneration(unittest.TestCase):
     def setUp(self):
