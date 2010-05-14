@@ -44,15 +44,6 @@ TODO
     variables are being referenced by this variable.  This should allow us to
     work around the current issues where the referenced variable name is
     constructed programmatically.
-  - Add case statement support to pysh.  I thought about possibly teaching the
-    parser to recover, but to exclude the contents of the case statement, it
-    would have to be able to identify its beginning and end, and we might as
-    well just parse the damn thing properly.
-
-    - Create a Case class for the ast
-    - Fix the case rules so they successfully match
-    - Make the case rules actually construct a Case object
-    - Add Case support to format_commands?
 
   - Do extensive profiling to improve performance
 
@@ -77,8 +68,12 @@ TODO
     Also, doing this much called via the constructor could be bad, maybe we
     should move that logic into a factory, since its more about how this
     thing is created than anything else..
+  - In pysh, add Case support to format_commands.
   - Split up the python and shell unit tests into multiple tests in a suite
-    for each, rather than one big string that tries to do it all.
+    for each, rather than one big string that tries to do it all.  Note that I
+    have started splitting up the shell test as a part of the work to support
+    case statements.
+
   - Sanitize the property names amongst the Value implementations
 
     - Rename 'references', as it is specifically references to variables in
@@ -118,12 +113,14 @@ Known Issues / Concerns
 - ShellValue
 
   - The variables which are flagged as 'export' are added to the references
-    for the ShellValue at object creation time currently.  This will be an
-    issue if we start constructing value objects in the AST as the statements
-    are evaluated, due to the order of operations.  Either references should
-    become a property for ShellValue which adds the current exports to the
-    internally held references, or we'll have to add the current exports in
-    the finalize step or something.
+    for the ShellValue at object creation time currently.  In addition, the
+    external command executions are filtered based on the available shell
+    functions defined in the metadata.  This will be an issue if we start
+    constructing value objects in the AST as the statements are evaluated, due
+    to the order of operations.  Either references should become a property
+    for ShellValue which adds the current exports to the internally held
+    references, or we'll have to add the current exports in the finalize step
+    or something.
   - The shell code which identifies defined functions and excludes them from
     the list of executed commands does not take into account context.  If one
     defined a function in a subshell, it would still exclude it from the list.

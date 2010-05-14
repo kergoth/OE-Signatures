@@ -220,16 +220,20 @@ class ShellValue(Value):
     def __init__(self, value, metadata):
         self.funcdefs = set()
         self.execs = set()
-        self.external_execs = set()
+        self.command_executions = set()
         Value.__init__(self, value, metadata)
 
     def parse(self):
         Value.parse(self)
-        self.external_execs = self.parse_shell(str(self.components))
+        self.command_executions = self.parse_shell(str(self.components))
         for var in self.metadata.keys():
-            if self.metadata.getVarFlag(var, "export"):
-                self.references.add(var)
-        self.references.update(self.external_execs)
+            flags = self.metadata.getVarFlags(var)
+            if flags:
+                if "export" in flags:
+                    self.references.add(var)
+                elif var in self.command_executions and \
+                     "func" in flags and "python" not in flags:
+                    self.references.add(var)
 
     def parse_shell(self, value):
         """Parse the supplied shell code in a string, returning the external
