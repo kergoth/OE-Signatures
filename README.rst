@@ -40,6 +40,12 @@ TODO
 
 - Top Priority Tasks
 
+  - The path information for the runtime recursion check appears to leave out
+    the top element, at least in some cases.
+  - Fix issue with the runtime recursion checking -- it isn't popping elements
+    as it returns from the tree traversal.
+  - Being bitten by an inexplicable RecursionError in attempting to generate a
+    signature.
   - Add support for a variable flag which indicates more explicitly which
     variables are being referenced by this variable.  This should allow us to
     work around the current issues where the referenced variable name is

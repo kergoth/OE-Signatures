@@ -68,7 +68,7 @@ class TestExpansions(unittest.TestCase):
         try:
             val.resolve()
         except kergoth.PythonExpansionError, exc:
-            self.assertEqual(len(exc.path), 3)
+            self.assertEqual(len(exc.path), 2)
         else:
             raise Exception("Did not raise expected PythonExpansionError")
 
@@ -82,6 +82,12 @@ class TestExpansions(unittest.TestCase):
         val = kergoth.Value("${undefinedvar} meh", self.d)
         self.assertEqual(str(val), "${undefinedvar} meh")
         self.assertEqual(val.references, set(["undefinedvar"]))
+
+    def test_double_reference(self):
+        self.d.setVar("BAR", "bar value")
+        self.d.setVar("FOO", "${BAR} foo ${BAR}")
+        val = kergoth.new_value("FOO", self.d)
+        val.resolve()
 
     def test_direct_recursion(self):
         self.d.setVar("FOO", "${FOO}")
@@ -239,6 +245,24 @@ class TestSignatureGeneration(unittest.TestCase):
         self.d["someval"] = "${undefinedvar} ${blacklistedvar} meh"
         signature = kergoth.Signature(self.d, keys=["someval"])
         self.assertEquals(signature.data_string, "{'someval': Value([VariableRef(['undefinedvar']), ' ', '${blacklistedvar}', ' meh'])}")
+
+    def test_signature_oe_devshell(self):
+        self.d.setVar("do_devshell", "devshell_do_devshell")
+        self.d.setVarFlag("do_devshell", "func", True)
+        devshell = """
+                export TERMWINDOWTITLE="Bitbake Developer Shell"
+                ${TERMCMD}
+                if [ $? -ne 0 ]; then
+                    echo "Fatal: '${TERMCMD}' not found. Check TERMCMD variable."
+                    exit 1
+                fi
+        """
+        self.d.setVar("devshell_do_devshell", devshell)
+        self.d.setVarFlag("devshell_do_devshell", "func", True)
+        self.d.setVar("GNOME_TERMCMD", "gnome-terminal --disable-factory -t \"$TERMWINDOWTITLE\"")
+        self.d.setVar("TERMCMD", "${GNOME_TERMCMD}")
+        signature = kergoth.Signature(self.d, keys=["do_devshell"])
+        signature.data_string
 
 
 import pickle

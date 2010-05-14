@@ -166,7 +166,9 @@ class Value(object):
         if path is None:
             path = []
         path.append(self)
-        return self.components.resolve(path)
+        resolved = self.components.resolve(path)
+        path.pop()
+        return resolved
 
     def parse(self):
         """Parse a value from the OE metadata into a Components object"""
