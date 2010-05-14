@@ -29,6 +29,7 @@ Recommendations for Exception Handling
 - When constructing a ShellValue, catch RecursionError, ShellSyntaxError, and
   NotImplementedError.
 - When constructing a PythonValue, catch SyntaxError.
+- When constructing a value via the new_value factory, catch all of the above.
 
 - When resolving (or converting to a string), catch RecursionError,
   SyntaxError, and PythonExpansionError.
@@ -76,6 +77,8 @@ TODO
     Also, doing this much called via the constructor could be bad, maybe we
     should move that logic into a factory, since its more about how this
     thing is created than anything else..
+  - Split up the python and shell unit tests into multiple tests in a suite
+    for each, rather than one big string that tries to do it all.
   - Sanitize the property names amongst the Value implementations
 
     - Rename 'references', as it is specifically references to variables in
