@@ -1,21 +1,5 @@
 #!/usr/bin/env python2.6
-"""Development of variable reference tracking and signature generation
-
-Notes:
-
-- Construction of a Value may raise RecursionError.
-- Construction of a ShellValue may raise ShellSyntaxError or
-  NotImplementedError.
-- Construction of a PythonValue may result in a syntax or runtime error, this
-  exception is not currently passed up.
-
-- Resolving a PythonSnippet may encounter a python syntax or runtime error,
-  this is not currently passed up.
-- Resolving a Value may raise RecursionError.
-  Naturally, resolving a Value may also raise the other *Value resolve time
-  exceptions, since a Value has Components, and Components can include any
-  existing Value.
-"""
+"""BitBake variable reference tracking and signature generation"""
 
 import re
 import codegen
@@ -42,6 +26,10 @@ class RecursionError(RuntimeError):
 
         return msg
 
+class PythonExpansionError(Exception):
+    def __str__(self):
+        value, exception = self.args[:2]
+        return "%s while resolving %s" % (exception, stable_repr(value))
 
 class Memoized(object):
     """Decorator that caches a function's return value each time it is called.
@@ -433,14 +421,11 @@ class PythonSnippet(PythonValue):
 
     def resolve(self, path = None):
         code = PythonValue.resolve(self, path)
-        codeobj = compile(code.strip(), "<expansion>", "eval")
         try:
+            codeobj = compile(code.strip(), "<expansion>", "eval")
             value = str(bb.utils.better_eval(codeobj, {"d": self.metadata}))
         except Exception, exc:
-            bb.msg.note(1, bb.msg.domain.Data,
-                        "%s:%s while evaluating:\n%s" % (type(exc), exc,
-                                                         code))
-            return "<invalid>"
+            raise PythonExpansionError(self, exc)
         return Value(value, self.metadata).resolve(path)
 
 

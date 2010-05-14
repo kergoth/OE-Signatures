@@ -26,14 +26,21 @@ TODO
 - Top Priority Tasks
 
   - Revamp the exception handling
+    - Wrap python syntax & runtime errors in a PythonSnippet in our own
+      exception. *DONE*
+    - Enhance the PythonExpansionError handling - catch it at each level and
+      re-raise with itself and the node that actually raised the exception as
+      arguments, so that at toplevel we'll have the root of the value tree.
+      In this way, we'll be able to see the exact flow of variable expansions
+      that led up to the failure, to give us more context.
 
     - Current behavior
 
       - Construction of a Value may raise RecursionError.
       - Construction of a ShellValue may raise ShellSyntaxError or
         NotImplementedError.
-      - Construction of a PythonValue may result in a syntax or runtime error, this
-        exception is not currently passed up.
+      - Construction of a PythonValue may raise SyntaxError.  This exception
+        is currently not passed up.
 
       - Resolving a PythonSnippet may encounter a python syntax or runtime error,
         this is not currently passed up.

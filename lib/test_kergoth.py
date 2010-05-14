@@ -51,6 +51,11 @@ class TestExpansions(unittest.TestCase):
         self.assertEqual(str(val), "value of foo value of bar")
         self.assertEqual(val.references, set(["foo", "bar"]))
 
+    def test_python_snippet_syntax_error(self):
+        self.d.setVar("FOO", "${@foo = 5}")
+        val = kergoth.new_value("FOO", self.d)
+        self.assertRaises(kergoth.PythonExpansionError, val.resolve)
+
     def test_value_containing_value(self):
         otherval = kergoth.Value("${@d.getVar('foo', True) + ' ${bar}'}", self.d)
         val = kergoth.Value(kergoth.Components([otherval, " test"]), self.d)
