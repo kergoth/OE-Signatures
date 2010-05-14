@@ -57,11 +57,11 @@ TODO
 
 - General
 
-    - Enhance the PythonExpansionError handling - catch it at each level and
-      re-raise with itself and the node that actually raised the exception as
-      arguments, so that at toplevel we'll have the root of the value tree.
-      In this way, we'll be able to see the exact flow of variable expansions
-      that led up to the failure, to give us more context.
+  - Enhance the PythonExpansionError handling - catch it at each level and
+    re-raise with itself and the node that actually raised the exception as
+    arguments, so that at toplevel we'll have the root of the value tree.
+    In this way, we'll be able to see the exact flow of variable expansions
+    that led up to the failure, to give us more context.
 
 - BitBake Integration
 
