@@ -61,6 +61,17 @@ class TestExpansions(unittest.TestCase):
         val = kergoth.new_value("FOO", self.d)
         self.assertRaises(kergoth.PythonExpansionError, val.resolve)
 
+    def test_python_snippet_error_path(self):
+        self.d.setVar("FOO", "foo value ${BAR}")
+        self.d.setVar("BAR", "bar value ${@int('test')}")
+        val = kergoth.new_value("FOO", self.d)
+        try:
+            val.resolve()
+        except kergoth.PythonExpansionError, exc:
+            self.assertTrue(len(exc.args) == 3)
+        else:
+            raise Exception("Did not raise expected PythonExpansionError")
+
     def test_value_containing_value(self):
         otherval = kergoth.Value("${@d.getVar('foo', True) + ' ${bar}'}", self.d)
         val = kergoth.Value(kergoth.Components([otherval, " test"]), self.d)

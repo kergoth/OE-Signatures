@@ -28,8 +28,11 @@ class RecursionError(RuntimeError):
 
 class PythonExpansionError(Exception):
     def __str__(self):
-        value, exception = self.args[:2]
-        return "%s while resolving %s" % (exception, stable_repr(value))
+        exception, node, path = self.args[:3]
+        msg = "%s while resolving %s" % (exception, stable_repr(node))
+        if path:
+            msg += " via %s" % " -> ".join(stable_repr(v) for v in path)
+        return msg
 
 class Memoized(object):
     """Decorator that caches a function's return value each time it is called.
@@ -419,7 +422,7 @@ class PythonSnippet(PythonValue):
         try:
             value = str(bb.utils.better_eval(codeobj, {"d": self.metadata}))
         except Exception, exc:
-            raise PythonExpansionError(self, exc)
+            raise PythonExpansionError(exc, self, path)
         return Value(value, self.metadata).resolve(path)
 
 
