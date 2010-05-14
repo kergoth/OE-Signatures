@@ -49,6 +49,12 @@ TODO
     variables are being referenced by this variable.  This should allow us to
     work around the current issues where the referenced variable name is
     constructed programmatically.
+  - Determine how best to handle exceptions for the signature generation
+    process.  Currently new_value is called but we aren't catching the
+    necessary exceptions there.  I expect we'll just want to warn for each,
+    but continue with the generation of the signature, but an alternative
+    would be to either let them get passed up as is, or wrap them in some sort
+    of signature failure exception.
 
   - Do extensive profiling to improve performance
 
