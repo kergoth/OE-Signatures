@@ -406,10 +406,8 @@ class PythonValue(Value):
         value = str(self.components)
         try:
             code = compile(value, "<string>", "exec", ast.PyCF_ONLY_AST)
-        except Exception, exc:
-            import traceback
-            bb.msg.note(1, None, "Failed to compile %s" % value)
-            bb.msg.note(1, None, str(traceback.format_exc(exc)))
+        except SyntaxError, exc:
+            raise PythonExpansionError(self, exc)
         else:
             self.visitor.visit(code)
 
