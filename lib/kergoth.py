@@ -83,6 +83,8 @@ class Components(list):
             path = []
         return "".join(self._resolve(path))
 
+    def __hash__(self):
+        return hash("Components(%s)" % ", ".join(repr(c) for c in self))
 
 class VariableRef(object):
     """Reference to a variable.  The variable name is supplied as a Components
@@ -153,7 +155,7 @@ class Value(object):
         return not self == other
 
     def __hash__(self):
-        return hash((self.components, self.metadata))
+        return hash((self.components, id(self.metadata)))
 
     def __repr__(self):
         return "%s(%s, %s)" % (self.__class__.__name__, repr(self.components),
