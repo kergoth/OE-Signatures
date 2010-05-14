@@ -27,11 +27,15 @@ class RecursionError(RuntimeError):
         return msg
 
 class PythonExpansionError(Exception):
+    def __init__(self, exception, node, path):
+        self.exception = exception
+        self.node = node
+        self.path = path
+
     def __str__(self):
-        exception, node, path = self.args[:3]
-        msg = "%s while resolving %s" % (exception, stable_repr(node))
+        msg = "%s while resolving %s" % (self.exception, stable_repr(self.node))
         if path:
-            msg += " via %s" % " -> ".join(stable_repr(v) for v in path)
+            msg += " via %s" % " -> ".join(stable_repr(v) for v in self.path)
         return msg
 
 class Memoized(object):

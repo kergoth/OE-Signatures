@@ -68,7 +68,8 @@ class TestExpansions(unittest.TestCase):
         try:
             val.resolve()
         except kergoth.PythonExpansionError, exc:
-            self.assertTrue(len(exc.args) == 3)
+            self.assertTrue(exc.path)
+            self.assertEqual(len(exc.path), 3)
         else:
             raise Exception("Did not raise expected PythonExpansionError")
 
