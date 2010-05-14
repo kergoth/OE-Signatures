@@ -74,6 +74,11 @@ class WhileLoop:
         self.condition = list(condition)
         self.cmds = list(cmds)
         
+class UntilLoop:
+    def __init__(self, condition, cmds):
+        self.condition = list(condition)
+        self.cmds = list(cmds)
+
 class FunDef:
     def __init__(self, name, body):
         self.name = str(name)
@@ -181,6 +186,7 @@ def p_command(p):
     if p[1][0] in ( 'simple_command', 
                     'for_clause',
                     'while_clause',
+                    'until_clause',
                     'if_clause',
                     'function_definition',
                     'subshell',
@@ -344,6 +350,7 @@ def p_maybe_until_word(p):
            
 def p_until_clause(p):
     """until_clause : until_word compound_list do_group"""
+    p[0] = ('until_clause', UntilLoop(p[2][1:], p[3][1:]))
                  
 def p_function_definition(p):
     """function_definition : fname LPARENS RPARENS linebreak function_body"""

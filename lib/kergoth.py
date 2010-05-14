@@ -264,6 +264,7 @@ class ShellValue(Value):
             "simple_command": lambda x: (None, x.words),
             "subshell": lambda x: (x.cmds, None),
             "while_clause": lambda x: (chain(x.condition, x.cmds), None),
+            "until_clause": lambda x: (chain(x.condition, x.cmds), None),
         }
 
         for token in tokens:

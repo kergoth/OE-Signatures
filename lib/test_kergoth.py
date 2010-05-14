@@ -192,6 +192,9 @@ class TestContentsTracking(unittest.TestCase):
         shellval = kergoth.ShellValue(self.shelldata, self.d)
         self.assertEquals(shellval.references, set(["somevar", "inverted"]))
 
+    def test_shell_until(self):
+        shellval = kergoth.ShellValue("until false; do echo true; done", self.d)
+
 class TestSignatureGeneration(unittest.TestCase):
     def setUp(self):
         self.d = bb.data.init()
