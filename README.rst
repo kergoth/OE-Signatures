@@ -21,18 +21,8 @@ bypass re-execution of the ast statements as well, simply letting 'dirty'
 state information flow through the variable references.
 
 
-Notes About Exception Handling
+Recommendations for Exception Handling
 ------------------------------
-
-- Construction of a Value may raise RecursionError.
-- Construction of a ShellValue may raise ShellSyntaxError or
-  NotImplementedError.
-- Construction of a PythonValue may raise PythonExpansionError.
-
-- Resolving a PythonSnippet may raise PythonExpansionError.
-- Resolving a Value (and its subclasses) may raise RecursionError.
-
-Recommendations:
 
 - When constructing a Value, catch RecursionError and SyntaxError (if there may
   be a python snippet).
