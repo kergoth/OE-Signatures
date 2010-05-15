@@ -35,7 +35,7 @@ class PythonExpansionError(Exception):
 
     def __str__(self):
         msg = "%s while resolving %s" % (self.exception, stable_repr(self.node))
-        if path:
+        if self.path:
             msg += " via %s" % " -> ".join(stable_repr(v) for v in self.path)
         return msg
 
