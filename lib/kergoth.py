@@ -594,9 +594,13 @@ class Signature(object):
         if self._data:
             return self._data
 
+        seen = set()
         def data_for_hash(key):
             """Returns an iterator over the variable names and their values, including references"""
 
+            if key in seen:
+                return
+            seen.add(key)
             valstr = self.metadata.getVar(key, False)
             if valstr is not None:
                 if not self.is_blacklisted(key):
