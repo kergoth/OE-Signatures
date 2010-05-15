@@ -639,15 +639,9 @@ class Signature(object):
             return item
 
         if isinstance(item, Value):
-            transformed = self.transform_blacklisted(item.components)
+            transformed = Components(self.transform_blacklisted(i) for i in item.components)
             if transformed != item.components:
                 return item.__class__(transformed, self.metadata)
-        elif isinstance(item, Components):
-            transformed = self.transform_blacklisted(tuple(item))
-            if transformed != item:
-                return Components(transformed)
-        elif isinstance(item, tuple):
-            return (self.transform_blacklisted(i) for i in item)
         elif isinstance(item, VariableRef):
             black = self.is_blacklisted(item)
             if black:

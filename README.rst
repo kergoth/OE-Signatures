@@ -44,7 +44,6 @@ TODO
     running against OE metadata.
   - Cache blacklist transformations, to avoid duplication of effort.
   - Avoid running data_for_hash on the same key more than once.
-  - Simplify blacklist transformation.
   - Add support for a variable flag which indicates more explicitly which
     variables are being referenced by this variable.  This should allow us to
     work around the current issues where the referenced variable name is
