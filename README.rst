@@ -46,10 +46,6 @@ TODO
     appears that this is the case for multiple so called "reserved" words in
     the lexer.  You can use 'case', 'esac', 'for', 'do', 'fi', etc as 'for x
     in' words, as well as variable names.
-  - Add support for a variable flag which indicates more explicitly which
-    variables are being referenced by this variable.  This should allow us to
-    work around the current issues where the referenced variable name is
-    constructed programmatically.
   - Determine how best to handle exceptions for the signature generation
     process.  Currently new_value is called but we aren't catching the
     necessary exceptions there.  I expect we'll just want to warn for each,

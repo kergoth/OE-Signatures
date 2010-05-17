@@ -11,6 +11,7 @@ from itertools import chain
 from collections import deque
 from pysh import pyshyacc, pyshlex, sherrors
 import bb.msg
+import bb.data
 import bb.utils
 
 from pysh.sherrors import ShellSyntaxError
@@ -502,6 +503,10 @@ def _new_value(variable, metadata, path):
             value = ShellValue(strvalue, metadata)
     else:
         value = Value(strvalue, metadata)
+
+    varrefs = metadata.getVarFlag(variable, "varrefs")
+    if varrefs:
+        value.references.update(bb.data.expand(varrefs, metadata).split())
 
     _value_cache[cache_key] = value
     return value
