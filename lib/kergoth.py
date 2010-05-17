@@ -484,8 +484,8 @@ def dedent_python(codestr):
     return untokenize(tokens)
 
 _value_cache = {}
-def _new_value(variable, metadata, path):
-    """Implementation of value creation factory"""
+def new_value(variable, metadata):
+    """Value creation factory for a variable in the metadata"""
 
     strvalue = metadata.getVar(variable, False)
     if strvalue is None:
@@ -502,7 +502,7 @@ def _new_value(variable, metadata, path):
         else:
             try:
                 value = ShellValue(strvalue, metadata)
-            except pyshlex.NeedMore, exc:
+            except pyshlex.NeedMore:
                 raise RuntimeError("Ran out of input while parsing shell for %s" % variable)
 
     else:
@@ -514,11 +514,6 @@ def _new_value(variable, metadata, path):
 
     _value_cache[cache_key] = value
     return value
-
-def new_value(variable, metadata):
-    """Value creation factory for a variable in the metadata"""
-
-    return _new_value(variable, metadata, [])
 
 def stable_repr(value):
     """Produce a more stable 'repr' string for a value"""
