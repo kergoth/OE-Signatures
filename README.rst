@@ -40,18 +40,16 @@ TODO
 
 - Top Priority Tasks
 
-  - Fix pysh lexing issues.  "fi" isn't always a reserved word, so it needs to
-    be handled more like "in".  In angstrom-feed-configs.bb, 'fi' is one of
-    the words a for loop is iterating over, and that seems to be legal.  It
-    appears that this is the case for multiple so called "reserved" words in
-    the lexer.  You can use 'case', 'esac', 'for', 'do', 'fi', etc as 'for x
-    in' words, as well as variable names.
   - Determine how best to handle exceptions for the signature generation
     process.  Currently new_value is called but we aren't catching the
     necessary exceptions there.  I expect we'll just want to warn for each,
     but continue with the generation of the signature, but an alternative
     would be to either let them get passed up as is, or wrap them in some sort
     of signature failure exception.
+  - qt-x11-free gets bitten by a NeedMore, due to its crazy quote usage.
+    Apparently the pysh parser can't handle this usage.  We should fix the
+    usage, since it isn't particularly portable afaik, also confirm that by
+    looking at posix/sus, and think about enhancing the lexer to handle it.
 
   - Cache blacklist transformations
   - Do extensive profiling to improve performance
@@ -60,9 +58,12 @@ TODO
 
   - The path information for the runtime recursion check appears to leave out
     the top element, at least in some cases.
-  - Create generally useful Visitor/Transformer classes for a Value tree, and
-    consider using them for the resolve process, rather than doing it so
-    implicitly in code scattered across the classes.
+  - Fix the AND-OR async issue in a way that can go upstream.
+  - Consider reworking the classes to be more data only nodes in a tree with
+    traversal tools, like traditional AST / semantic model, rather than the
+    current method.  While the current method of including behavior in the
+    classes is nicer from that perspective, it scatters the tree traversal
+    code across the nodes, and that behavior is fairly common.
 
 - BitBake Integration
 
