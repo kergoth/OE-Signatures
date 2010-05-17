@@ -40,10 +40,12 @@ TODO
 
 - Top Priority Tasks
 
-  - Determine the cause of what seems to be a signature generation hang when
-    running against OE metadata.
-  - Cache blacklist transformations, to avoid duplication of effort.
-  - Avoid running data_for_hash on the same key more than once.
+  - Fix pysh lexing issues.  "fi" isn't always a reserved word, so it needs to
+    be handled more like "in".  In angstrom-feed-configs.bb, 'fi' is one of
+    the words a for loop is iterating over, and that seems to be legal.  It
+    appears that this is the case for multiple so called "reserved" words in
+    the lexer.  You can use 'case', 'esac', 'for', 'do', 'fi', etc as 'for x
+    in' words, as well as variable names.
   - Add support for a variable flag which indicates more explicitly which
     variables are being referenced by this variable.  This should allow us to
     work around the current issues where the referenced variable name is
@@ -55,6 +57,7 @@ TODO
     would be to either let them get passed up as is, or wrap them in some sort
     of signature failure exception.
 
+  - Cache blacklist transformations
   - Do extensive profiling to improve performance
 
 - General
