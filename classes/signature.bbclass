@@ -23,3 +23,19 @@ addtask emit_signature
 do_emit_signature_all[nostamp] = "1"
 do_emit_signature_all[recrdeptask] = "do_emit_signature"
 addtask emit_signature_all after do_emit_signature
+
+python do_emit_data () {
+    import pickle
+
+    d = d.getVar("__RECIPEDATA", False) or d
+    vars = {}
+    flags = {}
+    for key in d.keys():
+        if not key.startswith("__"):
+            vars[key] = d.getVar(key, False)
+            flags[key] = d.getVarFlags(key)
+    pickle.dump(vars, open(bb.data.expand("${TOPDIR}/signatures/${PF}.vars", d), "wb"))
+    pickle.dump(flags, open(bb.data.expand("${TOPDIR}/signatures/${PF}.flags", d), "wb"))
+}
+do_emit_data[nostamp] = "1"
+addtask emit_data
