@@ -108,8 +108,10 @@ class TestExpansions(unittest.TestCase):
         except kergoth.RecursionError, exc:
             self.assertEqual(exc.variable, "FOO")
             self.assertEqual(list(exc.path), ["FOO", "BAR", "BAZ"])
+        else:
+            raise AssertionError("RecursionError not raised")
 
-    def test_recursion_exception_expansion_time(self):
+    def test_recursion_exception_runtime(self):
         self.d.setVar("FOO", "${BAR}")
         self.d.setVar("BAR", "${${@'FOO'}}")
         value = kergoth.new_value("FOO", self.d)
