@@ -266,13 +266,21 @@ class ShellValue(Value):
             cmds  = chain(*[item[1] for item in value.items])
             return cmds, words
 
+        def if_clause(value):
+            main = chain(value.cond, value.if_cmds)
+            rest = value.else_cmds
+            if isinstance(rest, tuple) and rest[0] == "elif":
+                return chain(main, if_clause(rest[1]))
+            else:
+                return chain(main, rest)
+
         token_handlers = {
             "and_or": lambda x: ((x.left, x.right), None),
             "async": lambda x: ([x], None),
             "brace_group": lambda x: (x.cmds, None),
             "for_clause": lambda x: (x.cmds, x.items),
             "function_definition": function_definition,
-            "if_clause": lambda x: (chain(x.if_cmds, x.else_cmds), None),
+            "if_clause": lambda x: (if_clause(x), None),
             "pipeline": lambda x: (x.commands, None),
             "redirect_list": lambda x: ([x.cmd], None),
             "simple_command": lambda x: (None, x.words),
