@@ -149,8 +149,8 @@ def p_list(p):
     if len(p)==2:
         p[0] = [p[1]]
     else:
-        if p[2]!=';':
-            raise NotImplementedError('AND-OR list asynchronous execution is not implemented')
+        #if p[2]!=';':
+        #    raise NotImplementedError('AND-OR list asynchronous execution is not implemented')
         p[0] = p[1] + [p[3]]
        
 def p_and_or(p):
