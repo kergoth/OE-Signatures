@@ -269,7 +269,7 @@ def p_for_clause(p):
     p[0] = ('for_clause', ForLoop(name, items, do_group[1:]))
 
 def p_name(p):
-    """name : TOKEN""" #Was NAME instead of TOKEN
+    """name : token""" #Was NAME instead of token
     p[0] = p[1]
 
 def p_in(p):
@@ -277,17 +277,17 @@ def p_in(p):
     p[0] = ('in', p[1])
 
 def p_wordlist(p):
-    """wordlist : wordlist TOKEN
-                |          TOKEN"""
+    """wordlist : wordlist token
+                |          token"""
     if len(p)==2:
         p[0] = ['wordlist', ('TOKEN', p[1])]
     else:
         p[0] = p[1] + [('TOKEN', p[2])]
 
 def p_case_clause(p):
-    """case_clause : Case TOKEN linebreak in linebreak case_list    Esac
-                   | Case TOKEN linebreak in linebreak case_list_ns Esac
-                   | Case TOKEN linebreak in linebreak              Esac"""
+    """case_clause : Case token linebreak in linebreak case_list    Esac
+                   | Case token linebreak in linebreak case_list_ns Esac
+                   | Case token linebreak in linebreak              Esac"""
     if len(p) < 8:
         items = []
     else:
@@ -333,8 +333,8 @@ def p_case_item(p):
     p[0] = ('case_item', (name, cmds))
                  
 def p_pattern(p):
-    """pattern :              TOKEN
-               | pattern PIPE TOKEN"""
+    """pattern :              token
+               | pattern PIPE token"""
     if len(p)==2:
         p[0] = ['pattern', ('TOKEN', p[1])]
     else:
@@ -395,7 +395,7 @@ def p_function_body(p):
     p[0] = p[1]    
 
 def p_fname(p):
-    """fname : TOKEN""" #Was NAME instead of TOKEN
+    """fname : TOKEN""" #Was NAME instead of token
     p[0] = p[1]
 
 def p_brace_group(p):
@@ -445,7 +445,7 @@ def p_cmd_name(p):
     p[0] = ('cmd_name', p[1])
     
 def p_cmd_word(p):
-    """cmd_word : TOKEN"""
+    """cmd_word : token"""
     p[0] = ('cmd_word', p[1])
 
 def p_maybe_assignment_word(p):
@@ -473,8 +473,8 @@ def p_cmd_prefix(p):
 def p_cmd_suffix(p):
     """cmd_suffix   :            io_redirect
                     | cmd_suffix io_redirect
-                    |            TOKEN
-                    | cmd_suffix TOKEN
+                    |            token
+                    | cmd_suffix token
                     |            maybe_for_word
                     | cmd_suffix maybe_for_word
                     |            maybe_done_word
@@ -621,6 +621,11 @@ def p_assignment_word(p):
 def p_bang_word(p):
     """bang_word : maybe_bang_word"""
     p[0] = ('bang_word', p[1][1])
+
+def p_token(p):
+    """token : TOKEN
+             | Fi"""
+    p[0] = p[1]
 
 def p_empty(p):
     'empty :'
