@@ -500,7 +500,11 @@ def _new_value(variable, metadata, path):
         if metadata.getVarFlag(variable, "python"):
             value = PythonValue(dedent_python(strvalue.expandtabs()), metadata)
         else:
-            value = ShellValue(strvalue, metadata)
+            try:
+                value = ShellValue(strvalue, metadata)
+            except pyshlex.NeedMore, exc:
+                raise RuntimeError("Ran out of input while parsing shell for %s" % variable)
+
     else:
         value = Value(strvalue, metadata)
 
