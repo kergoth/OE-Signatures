@@ -622,8 +622,9 @@ class Signature(object):
                             yield other
 
         if not self.keys:
-            self.keys = [key for key in self.metadata.keys()
-                         if self.metadata.getVarFlag(key, "task")]
+            self.keys = self.metadata.keys()
+#             self.keys = [key for key in self.metadata.keys()
+#                          if self.metadata.getVarFlag(key, "task")]
         data = self._data = dict(chain(*[data_for_hash(key) for key in self.keys]))
         return data
 

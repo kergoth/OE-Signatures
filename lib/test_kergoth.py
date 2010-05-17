@@ -91,27 +91,17 @@ class TestExpansions(unittest.TestCase):
 
     def test_direct_recursion(self):
         self.d.setVar("FOO", "${FOO}")
-        self.assertRaises(kergoth.RecursionError, kergoth.new_value, "FOO", self.d)
+        value = kergoth.new_value("FOO", self.d)
+        self.assertRaises(kergoth.RecursionError, str, value)
 
     def test_indirect_recursion(self):
         self.d.setVar("FOO", "${BAR}")
         self.d.setVar("BAR", "${BAZ}")
         self.d.setVar("BAZ", "${FOO}")
-        self.assertRaises(kergoth.RecursionError, kergoth.new_value, "FOO", self.d)
+        value = kergoth.new_value("FOO", self.d)
+        self.assertRaises(kergoth.RecursionError, str, value)
 
     def test_recursion_exception(self):
-        self.d.setVar("FOO", "${BAR}")
-        self.d.setVar("BAR", "${BAZ}")
-        self.d.setVar("BAZ", "${FOO}")
-        try:
-            value = kergoth.new_value("FOO", self.d)
-        except kergoth.RecursionError, exc:
-            self.assertEqual(exc.variable, "FOO")
-            self.assertEqual(list(exc.path), ["FOO", "BAR", "BAZ"])
-        else:
-            raise AssertionError("RecursionError not raised")
-
-    def test_recursion_exception_runtime(self):
         self.d.setVar("FOO", "${BAR}")
         self.d.setVar("BAR", "${${@'FOO'}}")
         value = kergoth.new_value("FOO", self.d)
@@ -120,6 +110,8 @@ class TestExpansions(unittest.TestCase):
         except kergoth.RecursionError, exc:
             self.assertEqual(exc.variable, "FOO")
             self.assertTrue(kergoth.new_value("BAR", self.d) in exc.path)
+        else:
+            raise Exception("RecursionError not raised")
 
 
 def test_memoize():
