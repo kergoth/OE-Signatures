@@ -495,13 +495,6 @@ def _new_value(variable, metadata, path):
     else:
         value = Value(strvalue, metadata)
 
-    path.append(variable)
-    for ref in value.references:
-        if ref in path:
-            raise RecursionError(path[0], path)
-        _new_value(ref, metadata, path)
-    path.pop()
-
     _value_cache[cache_key] = value
     return value
 
