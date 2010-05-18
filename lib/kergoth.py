@@ -208,6 +208,8 @@ class Value(object):
                     current.append(token)
             else:
                 result.append(token)
+        if current:
+            result += current
         self.components = result
 
 
