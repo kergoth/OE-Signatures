@@ -506,6 +506,8 @@ def new_value(variable, metadata):
                 value = ShellValue(strvalue, metadata)
             except pyshlex.NeedMore:
                 raise RuntimeError("Ran out of input while parsing shell for %s" % variable)
+            except ShellSyntaxError, exc:
+                raise RuntimeError("Syntax error parsing shell for %s: %s" % (variable, exc))
 
     else:
         value = Value(strvalue, metadata)
