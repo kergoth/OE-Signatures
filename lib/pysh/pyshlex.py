@@ -772,7 +772,7 @@ class Lexer:
                     self._heredoc.op = self._token
                 
         if self._type==TK_TOKEN:            
-            if '=' in self._token:
+            if '=' in self._token and not delim:
                 if self._token.startswith('='):
                     #Token is a WORD... a TOKEN that is.
                     pass
