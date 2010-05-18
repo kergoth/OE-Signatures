@@ -40,8 +40,9 @@ TODO
 
 - Top Priority Tasks
 
-  - pyshlex is incorrectly picking up an assignment inside of a HEREDOC as an
-    ASSIGNMENT_WORD.
+  - ERROR: Error in executing python function in: /home/kergoth/Code/oe/openembedded/recipes/servlet-api/jsp2.0_5.5.26.bb
+    ERROR: Exception:<type 'exceptions.RuntimeError'> Message:Ran out of input while parsing shell for do_compile
+
   - Cache blacklist transformations
   - Do extensive profiling to improve performance
 
