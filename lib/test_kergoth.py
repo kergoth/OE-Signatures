@@ -119,6 +119,55 @@ def test_memoize():
     d.setVar("FOO", "bar")
     assert(kergoth.new_value("FOO", d) is kergoth.new_value("FOO", d))
 
+class TestShell(unittest.TestCase):
+    def setUp(self):
+        self.d = bb.data.init()
+
+    def test_quotes_inside_assign(self):
+        value = kergoth.ShellValue('foo=foo"bar"baz', self.d)
+
+    def test_quotes_inside_arg(self):
+        value = kergoth.ShellValue('sed s#"bar baz"#"alpha beta"#g', self.d)
+
+    def test_arg_continuation(self):
+        value = kergoth.ShellValue("sed -i -e s,foo,bar,g \\\n *.pc", self.d)
+
+    def test_dollar_in_quoted(self):
+        value = kergoth.ShellValue('sed -i -e "foo$" *.pc', self.d)
+
+    def test_quotes_inside_arg_continuation(self):
+        value = kergoth.ShellValue("""
+        sed -i -e s#"moc_location=.*$"#"moc_location=${bindir}/moc4"# \\
+               -e s#"uic_location=.*$"#"uic_location=${bindir}/uic4"# \\
+               ${D}${libdir}/pkgconfig/*.pc
+        """, self.d)
+
+    def test_subshell_expansion(self):
+        value = kergoth.ShellValue("foo=$(echo bar)", self.d)
+
+    def test_shell_unexpanded(self):
+        value = kergoth.ShellValue('echo "${QT_BASE_NAME}"', self.d)
+
+    def test_incomplete_varexp_single_quotes(self):
+        value = kergoth.ShellValue("sed -i -e 's:IP{:I${:g' $pc", self.d)
+
+    def test_until(self):
+        shellval = kergoth.ShellValue("until false; do echo true; done", self.d)
+        self.assertEquals(shellval.command_executions, set(["false", "echo"]))
+        self.assertEquals(shellval.references, set())
+
+    def test_case(self):
+        script = """
+case $foo in
+    *)
+        bar
+        ;;
+esac
+        """
+        shellval = kergoth.ShellValue(script, self.d)
+        self.assertEquals(shellval.command_executions, set(["bar"]))
+        self.assertEquals(shellval.references, set())
+
 class TestContentsTracking(unittest.TestCase):
     def setUp(self):
         self.d = bb.data.init()
@@ -191,23 +240,6 @@ class TestContentsTracking(unittest.TestCase):
 
         shellval = kergoth.ShellValue(self.shelldata, self.d)
         self.assertEquals(shellval.references, set(["somevar", "inverted"]))
-
-    def test_shell_until(self):
-        shellval = kergoth.ShellValue("until false; do echo true; done", self.d)
-        self.assertEquals(shellval.command_executions, set(["false", "echo"]))
-        self.assertEquals(shellval.references, set())
-
-    def test_shell_case(self):
-        script = """
-case $foo in
-    *)
-        bar
-        ;;
-esac
-        """
-        shellval = kergoth.ShellValue(script, self.d)
-        self.assertEquals(shellval.command_executions, set(["bar"]))
-        self.assertEquals(shellval.references, set())
 
 class TestSignatureGeneration(unittest.TestCase):
     def setUp(self):
