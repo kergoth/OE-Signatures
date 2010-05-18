@@ -7,6 +7,9 @@
 
 BB_HASH_BLACKLIST += "__* *DIR *_DIR_* PATH PWD BBPATH FILE PARALLEL_MAKE"
 
+# These are blacklisted due to python exceptions
+BB_HASH_BLACKLIST += "PYTHON_DIR"
+
 python () {
     d.setVar("__RECIPEDATA", d)
 }
@@ -15,7 +18,8 @@ python () {
 
 python do_emit_signature () {
     import kergoth
-    bb.note(str(kergoth.Signature(d.getVar('__RECIPEDATA', False) or d)))
+    signature = kergoth.Signature(d.getVar("__RECIPEDATA", False) or d)
+    bb.msg.note(1, None, bb.data.expand("${PF}: metadata signature is %s" % signature, d))
 }
 do_emit_signature[nostamp] = "1"
 addtask emit_signature
