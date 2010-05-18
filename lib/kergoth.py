@@ -610,12 +610,20 @@ class Signature(object):
             if key in seen:
                 return
             seen.add(key)
+            if self.is_blacklisted(key):
+                return
+
             valstr = self.metadata.getVar(key, False)
             if valstr is not None:
-                if not self.is_blacklisted(key):
+                try:
                     value = self.transform_blacklisted(new_value(key, self.metadata))
-
+                except (SyntaxError, ShellSyntaxError, NotImplementedError,
+                        PythonExpansionError, RecursionError), exc:
+                    bb.msg.error(None, "Unable to parse %s, excluding from signature: %s" %
+                                 (key, exc))
+                else:
                     yield key, value
+
                     for ref in value.references:
                         for other in data_for_hash(ref):
                             yield other
