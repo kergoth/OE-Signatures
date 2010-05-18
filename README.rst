@@ -40,17 +40,8 @@ TODO
 
 - Top Priority Tasks
 
-  - Determine how best to handle exceptions for the signature generation
-    process.  Currently new_value is called but we aren't catching the
-    necessary exceptions there.  I expect we'll just want to warn for each,
-    but continue with the generation of the signature, but an alternative
-    would be to either let them get passed up as is, or wrap them in some sort
-    of signature failure exception.
-  - qt-x11-free gets bitten by a NeedMore, due to its crazy quote usage.
-    Apparently the pysh parser can't handle this usage.  We should fix the
-    usage, since it isn't particularly portable afaik, also confirm that by
-    looking at posix/sus, and think about enhancing the lexer to handle it.
-
+  - pyshlex is incorrectly picking up an assignment inside of a HEREDOC as an
+    ASSIGNMENT_WORD.
   - Cache blacklist transformations
   - Do extensive profiling to improve performance
 
