@@ -230,7 +230,12 @@ class ShellValue(Value):
 
     def parse(self):
         Value.parse(self)
-        self.command_executions = self.parse_shell(str(self.components))
+        try:
+            strvalue = str(self.components)
+        except (RecursionError, PythonExpansionError), exc:
+            strvalue = self.value
+
+        self.command_executions = self.parse_shell(strvalue)
         for var in self.metadata.keys():
             flags = self.metadata.getVarFlags(var)
             if flags:
