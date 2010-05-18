@@ -168,6 +168,37 @@ esac
         self.assertEquals(shellval.command_executions, set(["bar"]))
         self.assertEquals(shellval.references, set())
 
+    def test_assign_exec(self):
+        value = kergoth.ShellValue("a=b c='foo bar' alpha 1 2 3", self.d)
+
+    def test_assign_newlines_exec(self):
+        value = kergoth.ShellValue("a=b\nc='foo bar'\n alpha 1 2 3", self.d)
+
+    def test_redirect_to_file(self):
+        value = kergoth.ShellValue("echo foo >${foo}/bar", self.d)
+
+    def test_heredoc(self):
+        script = """
+        cat <<END
+alpha
+beta
+theta
+END
+        """
+        value = kergoth.ShellValue(script, self.d)
+
+    def test_redirect_from_heredoc(self):
+        script = """
+    cat <<END >${B}/cachedpaths
+shadow_cv_maildir=${SHADOW_MAILDIR}
+shadow_cv_mailfile=${SHADOW_MAILFILE}
+shadow_cv_utmpdir=${SHADOW_UTMPDIR}
+shadow_cv_logdir=${SHADOW_LOGDIR}
+shadow_cv_passwd_dir=${bindir}
+END
+        """
+        value = kergoth.ShellValue(script, self.d)
+
 class TestContentsTracking(unittest.TestCase):
     def setUp(self):
         self.d = bb.data.init()
