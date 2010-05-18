@@ -573,7 +573,7 @@ class Signature(object):
         return "Signature(%s, %s, %s)" % (self.metadata, self.keys, self.blacklist)
 
     def __hash__(self):
-        return hash((self.metadata, self.keys, self.blacklist))
+        return hash((id(self.metadata), self.keys, self.blacklist))
 
     def __str__(self):
         from base64 import urlsafe_b64encode
