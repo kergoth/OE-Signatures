@@ -199,6 +199,14 @@ END
         """
         value = kergoth.ShellValue(script, self.d)
 
+    def test_incomplete_command_expansion(self):
+        from pysh import pyshlex
+        self.assertRaises(pyshlex.NeedMore, kergoth.ShellValue, "cp foo`", self.d)
+
+    def test_rogue_dollarsign(self):
+        self.d.setVar("D", "/tmp")
+        kergoth.ShellValue("install -d ${D}$", self.d)
+
 class TestContentsTracking(unittest.TestCase):
     def setUp(self):
         self.d = bb.data.init()
