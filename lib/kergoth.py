@@ -105,7 +105,7 @@ class VariableRef(object):
         if path is None:
             path = []
 
-        name = "".join(str(v) for v in self.components.resolve(path))
+        name = self.components.resolve(path)
         value = new_value(name, self.metadata)
         if value in path:
             raise RecursionError(name, path)
