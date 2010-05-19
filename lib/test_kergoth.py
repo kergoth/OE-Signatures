@@ -207,6 +207,12 @@ END
         self.d.setVar("D", "/tmp")
         kergoth.ShellValue("install -d ${D}$", self.d)
 
+    def test_varrefs(self):
+        self.d.setVar("FOO", "foo=oe_libinstall; eval $foo")
+        self.d.setVarFlag("FOO", "varrefs", "oe_libinstall")
+        value = kergoth.new_value("FOO", self.d)
+        self.assertEqual(set(["oe_libinstall"]), value.references)
+
 class TestContentsTracking(unittest.TestCase):
     def setUp(self):
         self.d = bb.data.init()
