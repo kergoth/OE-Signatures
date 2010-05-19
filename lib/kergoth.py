@@ -519,7 +519,9 @@ def new_value(variable, metadata):
 
     varrefs = metadata.getVarFlag(variable, "varrefs")
     if varrefs:
-        value.references.update(bb.data.expand(varrefs, metadata).split())
+        refs = Value(varrefs, metadata)
+        value.references.update(refs.references)
+        value.references.update(str(refs).split())
 
     _value_cache[cache_key] = value
     return value
