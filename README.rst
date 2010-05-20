@@ -24,9 +24,9 @@ state information flow through the variable references.
 Recommendations for Exception Handling
 ------------------------------
 
-- When constructing a Value, catch RecursionError and SyntaxError (if there may
-  be a python snippet).
-- When constructing a ShellValue, catch RecursionError, ShellSyntaxError, and
+- When constructing a Value, catch SyntaxError (if there may be a python
+  snippet).
+- When constructing a ShellValue, catch ShellSyntaxError, and
   NotImplementedError.
 - When constructing a PythonValue, catch SyntaxError.
 - When constructing a value via the new_value factory, catch all of the above.
