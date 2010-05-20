@@ -282,6 +282,9 @@ class ShellValue(Value):
             else:
                 return chain(main, rest)
 
+        def simple_command(value):
+            return None, chain(value.words, (assign[1] for assign in value.assigns))
+
         token_handlers = {
             "and_or": lambda x: ((x.left, x.right), None),
             "async": lambda x: ([x], None),
@@ -291,10 +294,10 @@ class ShellValue(Value):
             "if_clause": lambda x: (if_clause(x), None),
             "pipeline": lambda x: (x.commands, None),
             "redirect_list": lambda x: ([x.cmd], None),
-            "simple_command": lambda x: (None, x.words),
             "subshell": lambda x: (x.cmds, None),
             "while_clause": lambda x: (chain(x.condition, x.cmds), None),
             "until_clause": lambda x: (chain(x.condition, x.cmds), None),
+            "simple_command": simple_command,
             "case_clause": case_clause,
         }
 
@@ -317,6 +320,7 @@ class ShellValue(Value):
         the command name argument.
         """
 
+        words = list(words)
         for word in list(words):
             wtree = pyshlex.make_wordtree(word[1])
             for part in wtree:
@@ -331,16 +335,23 @@ class ShellValue(Value):
                         if word in words:
                             words.remove(word)
 
+        usetoken = False
         for word in words:
-            if word[0] in ("cmd_name", "cmd_word"):
+            if word[0] in ("cmd_name", "cmd_word") or \
+               (usetoken and word[0] == "TOKEN"):
+                if "=" in word[1]:
+                    usetoken = True
+                    continue
+
                 cmd = word[1]
                 if cmd.startswith("$"):
-                    bb.msg.debug(1, None, "Warning: execution of non-literal command '%s'" % word[1])
+                    bb.msg.debug(1, None, "Warning: execution of non-literal command '%s'" % cmd)
                 elif cmd == "eval":
                     command = " ".join(word for _, word in words[1:])
                     self.parse_shell(command)
                 else:
                     self.execs.add(cmd)
+                break
 
 
 class PythonValue(Value):

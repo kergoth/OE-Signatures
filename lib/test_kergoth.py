@@ -146,7 +146,7 @@ class TestShell(unittest.TestCase):
         """, self.d)
         self.assertEqual(value.references, set(["bindir", "D", "libdir"]))
 
-    def test_subshell_expansion(self):
+    def test_assign_subshell_expansion(self):
         value = kergoth.ShellValue("foo=$(echo bar)", self.d)
         self.assertEqual(value.execs, set(["echo"]))
 
@@ -178,10 +178,6 @@ esac
 
     def test_assign_exec(self):
         value = kergoth.ShellValue("a=b c='foo bar' alpha 1 2 3", self.d)
-        self.assertEquals(value.execs, set(["alpha"]))
-
-    def test_assign_newlines_exec(self):
-        value = kergoth.ShellValue("a=b\nc='foo bar'\n alpha 1 2 3", self.d)
         self.assertEquals(value.execs, set(["alpha"]))
 
     def test_redirect_to_file(self):
