@@ -40,6 +40,22 @@ TODO
 
 - Top Priority Tasks
 
+  - Finish populating all necessary varrefs flags for the packaging classes in
+    OpenEmbedded
+  - Figure out how to handle the methodpool.  Unfortunately, once a methodpool
+    function goes from the parse into the method pool, it does not also end up
+    in the metadata.  Is it possible to get an ast from an already compiled
+    python object?  Also, should we support varref flags on a variable named
+    the same name as a method pool function, even though the method pool
+    function itself isn't in the metadata?
+  - Add the shell function annd python function calls, filtered by what's
+    defined in the metadata, to the references set in the value objects.
+
+  - Audit all OpenEmbedded metadata for changes to OVERRIDES followed by calls
+    to update_data.  These cases can almost certainly be replaced with
+    directly accessing the specific conditional variables they want (i.e.
+    RDEPENDS_<pkg>).
+
   - Cache blacklist transformations
   - Do extensive profiling to improve performance
 
