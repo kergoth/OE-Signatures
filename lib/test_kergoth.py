@@ -319,9 +319,9 @@ class TestPython(unittest.TestCase):
         self.assertEqual(value.calls, set())
 
     def test_var_reference(self):
-        value = kergoth.PythonValue("print('${FOO}')", self.d)
+        value = kergoth.PythonValue("foo('${FOO}')", self.d)
         self.assertEqual(value.references, set(["FOO"]))
-        self.assertEqual(value.calls, set(["print"]))
+        self.assertEqual(value.calls, set(["foo"]))
 
 class TestSignatureGeneration(unittest.TestCase):
     def setUp(self):
