@@ -46,16 +46,6 @@ TODO
     to update_data.  These cases can almost certainly be replaced with
     directly accessing the specific conditional variables they want (i.e.
     RDEPENDS_<pkg>).
-  - Add support to PythonValue to filter its calls based on the functions in
-    the methodpool, and create a Value member representing methodpool
-    references, which will be used by the Signature class to ensure they're
-    included.  Signature can use pickle.dumps() to get a string representation
-    of the methodpool function for its hashing.
-  - Add support to Signature to support a varrefs flag for a methodpool
-    function, even though the methodpool function is not in the metadata, and
-    only do so if there isn't *also* an existing variable in the metadata by
-    that name.  This is necessary since we can't use the ast to analyze the
-    methodpool functions for variable references.
 
   - Cache blacklist transformations
   - Do extensive profiling to improve performance
