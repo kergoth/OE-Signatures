@@ -46,14 +46,16 @@ TODO
     to update_data.  These cases can almost certainly be replaced with
     directly accessing the specific conditional variables they want (i.e.
     RDEPENDS_<pkg>).
-
-  - Figure out how best to modify BitBake to allow us to analyze and hash the
-    methodpool functions.  We can't do so, as far as I can tell, without
-    modifying BitBake, as the python functions which get injected into the
-    bitbake methodpool no longer exist in the metadata, or in any form other
-    than a python object.  It's too late at that point to get an ast of the
-    function, and I don't want to write something like PythonValue that uses
-    the dis module to look at the bytecode.
+  - Add support to PythonValue to filter its calls based on the functions in
+    the methodpool, and create a Value member representing methodpool
+    references, which will be used by the Signature class to ensure they're
+    included.  Signature can use pickle.dumps() to get a string representation
+    of the methodpool function for its hashing.
+  - Add support to Signature to support a varrefs flag for a methodpool
+    function, even though the methodpool function is not in the metadata, and
+    only do so if there isn't *also* an existing variable in the metadata by
+    that name.  This is necessary since we can't use the ast to analyze the
+    methodpool functions for variable references.
 
   - Cache blacklist transformations
   - Do extensive profiling to improve performance
@@ -85,6 +87,9 @@ TODO
     or should the original know something about the layering?  I expect the
     former, but needs thought.
   - Longer term: potentially construct non-string values based on flags.
+  - Revamp the methodpool functions.  We can't have them only in the
+    methodpool as python objects, we need to retain an association with the
+    metadata variables.
 
 - Cleanup
 
