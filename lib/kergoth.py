@@ -225,7 +225,7 @@ class ShellValue(Value):
     def __init__(self, value, metadata):
         self.funcdefs = set()
         self.execs = set()
-        self.command_executions = set()
+        self.execs = set()
         Value.__init__(self, value, metadata)
 
     def parse(self):
@@ -235,13 +235,13 @@ class ShellValue(Value):
         except (RecursionError, PythonExpansionError), exc:
             strvalue = self.value
 
-        self.command_executions = self.parse_shell(strvalue)
+        self.execs = self.parse_shell(strvalue)
         for var in self.metadata.keys():
             flags = self.metadata.getVarFlags(var)
             if flags:
                 if "export" in flags:
                     self.references.add(var)
-                elif var in self.command_executions and \
+                elif var in self.execs and \
                      "func" in flags and "python" not in flags:
                     self.references.add(var)
 
@@ -448,6 +448,11 @@ class PythonValue(Value):
 
         self.references.update(self.visitor.var_references)
         self.calls = self.visitor.direct_func_calls
+        for var in self.metadata.keys():
+            flags = self.metadata.getVarFlags(var)
+            if flags and var in self.calls and \
+               "func" in flags and "python" in flags:
+                    self.references.add(var)
 
 class PythonSnippet(PythonValue):
     """Lazy evaluation of a python snippet"""

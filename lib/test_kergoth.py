@@ -153,7 +153,7 @@ class TestShell(unittest.TestCase):
 
     def test_until(self):
         shellval = kergoth.ShellValue("until false; do echo true; done", self.d)
-        self.assertEquals(shellval.command_executions, set(["false", "echo"]))
+        self.assertEquals(shellval.execs, set(["false", "echo"]))
         self.assertEquals(shellval.references, set())
 
     def test_case(self):
@@ -165,7 +165,7 @@ case $foo in
 esac
         """
         shellval = kergoth.ShellValue(script, self.d)
-        self.assertEquals(shellval.command_executions, set(["bar"]))
+        self.assertEquals(shellval.execs, set(["bar"]))
         self.assertEquals(shellval.references, set())
 
     def test_assign_exec(self):
