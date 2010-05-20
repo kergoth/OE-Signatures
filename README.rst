@@ -62,7 +62,9 @@ TODO
 
 - General
 
-  - Does parser.compileast() work on an ast module ast, or a compiler.ast ast?
+  - Think about storing the PythonValue ast and utilizing it in PythonSnippet
+    to compile the code from that, rather than having it re-parse the string.
+    The 'compile' function can compile an ast object directly.
   - Handle the 'rogue dollar sign' case in shell more sanely.  Most shells
     seem just fine with 'install -d ${D}$', as the trailing $ ends up a part
     of the filename.  pysh chokes on it, however, since it's expecting to see
