@@ -42,19 +42,18 @@ TODO
 
   - Finish populating all necessary varrefs flags for the packaging classes in
     OpenEmbedded
-  - Figure out how to handle the methodpool.  Unfortunately, once a methodpool
-    function goes from the parse into the method pool, it does not also end up
-    in the metadata.  Is it possible to get an ast from an already compiled
-    python object?  Also, should we support varref flags on a variable named
-    the same name as a method pool function, even though the method pool
-    function itself isn't in the metadata?
-  - Add handling of bb.build.exec_func and bb.build.exec_task to PythonValue,
-    as these, too, are calls / references of a sort
-
   - Audit all OpenEmbedded metadata for changes to OVERRIDES followed by calls
     to update_data.  These cases can almost certainly be replaced with
     directly accessing the specific conditional variables they want (i.e.
     RDEPENDS_<pkg>).
+
+  - Figure out how best to modify BitBake to allow us to analyze and hash the
+    methodpool functions.  We can't do so, as far as I can tell, without
+    modifying BitBake, as the python functions which get injected into the
+    bitbake methodpool no longer exist in the metadata, or in any form other
+    than a python object.  It's too late at that point to get an ast of the
+    function, and I don't want to write something like PythonValue that uses
+    the dis module to look at the bytecode.
 
   - Cache blacklist transformations
   - Do extensive profiling to improve performance
