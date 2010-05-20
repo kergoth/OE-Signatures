@@ -48,8 +48,8 @@ TODO
     python object?  Also, should we support varref flags on a variable named
     the same name as a method pool function, even though the method pool
     function itself isn't in the metadata?
-  - Add the shell function annd python function calls, filtered by what's
-    defined in the metadata, to the references set in the value objects.
+  - Add handling of bb.build.exec_func and bb.build.exec_task to PythonValue,
+    as these, too, are calls / references of a sort
 
   - Audit all OpenEmbedded metadata for changes to OVERRIDES followed by calls
     to update_data.  These cases can almost certainly be replaced with
@@ -61,9 +61,13 @@ TODO
 
 - General
 
+  - Handle the 'rogue dollar sign' case in shell more sanely.  Most shells
+    seem just fine with 'install -d ${D}$', as the trailing $ ends up a part
+    of the filename.  pysh chokes on it, however, since it's expecting to see
+    the remainder of a ${} expansion.
+  - Fix the AND-OR async issue in a way that can go upstream.
   - The path information for the runtime recursion check appears to leave out
     the top element, at least in some cases.
-  - Fix the AND-OR async issue in a way that can go upstream.
   - Consider reworking the classes to be more data only nodes in a tree with
     traversal tools, like traditional AST / semantic model, rather than the
     current method.  While the current method of including behavior in the
