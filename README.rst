@@ -62,6 +62,7 @@ TODO
 
 - General
 
+  - Does parser.compileast() work on an ast module ast, or a compiler.ast ast?
   - Handle the 'rogue dollar sign' case in shell more sanely.  Most shells
     seem just fine with 'install -d ${D}$', as the trailing $ ends up a part
     of the filename.  pysh chokes on it, however, since it's expecting to see
