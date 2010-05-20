@@ -329,19 +329,6 @@ class TestPython(unittest.TestCase):
         value = kergoth.PythonValue("bb.build.exec_func('do_something', d)", self.d)
         self.assertEqual(value.references, set(["do_something"]))
 
-    def test_function_reference(self):
-        if hasattr(bb.utils, "_context"):
-            context = bb.utils._context
-        else:
-            context = __builtins__
-
-        context["testfunc"] = lambda: bb.msg.note(1, None, "Hello, World!")
-        self.d.setVar("FOO", "bar")
-        value = kergoth.PythonValue("testfunc('${FOO}')", self.d)
-        self.assertEqual(value.references, set(["FOO"]))
-        self.assertEqual(value.function_references, set([("testfunc", context["testfunc"])]))
-        del context["testfunc"]
-
 class TestSignatureGeneration(unittest.TestCase):
     def setUp(self):
         self.d = bb.data.init()
@@ -391,23 +378,6 @@ class TestSignatureGeneration(unittest.TestCase):
         signature = kergoth.Signature(self.d, keys=["do_devshell"])
         signature.data_string
 
-    def test_function_reference(self):
-        if hasattr(bb.utils, "_context"):
-            context = bb.utils._context
-        else:
-            context = __builtins__
-
-        context["testfunc"] = lambda x: bb.msg.note(1, None, "Hello, %s!" % x)
-        self.d.setVar("FOO", "bar")
-        self.d.setVar("do_something", "testfunc('${FOO}')")
-        self.d.setVarFlags("do_something", {"func": True, "python": True})
-        signature = kergoth.Signature(self.d, keys=["do_something"])
-
-        context["testfunc"] = lambda x: bb.msg.note(1, None, "Goodbye, %s!" % x)
-        newsignature = kergoth.Signature(self.d, keys=["do_something"])
-        del context["testfunc"]
-
-        self.assertNotEqual(signature, newsignature)
 
 import pickle
 def test_oedata():
