@@ -128,12 +128,15 @@ class TestShell(unittest.TestCase):
 
     def test_quotes_inside_arg(self):
         value = kergoth.ShellValue('sed s#"bar baz"#"alpha beta"#g', self.d)
+        self.assertEqual(value.execs, set(["sed"]))
 
     def test_arg_continuation(self):
         value = kergoth.ShellValue("sed -i -e s,foo,bar,g \\\n *.pc", self.d)
+        self.assertEqual(value.execs, set(["sed"]))
 
     def test_dollar_in_quoted(self):
         value = kergoth.ShellValue('sed -i -e "foo$" *.pc', self.d)
+        self.assertEqual(value.execs, set(["sed"]))
 
     def test_quotes_inside_arg_continuation(self):
         value = kergoth.ShellValue("""
@@ -141,15 +144,20 @@ class TestShell(unittest.TestCase):
                -e s#"uic_location=.*$"#"uic_location=${bindir}/uic4"# \\
                ${D}${libdir}/pkgconfig/*.pc
         """, self.d)
+        self.assertEqual(value.references, set(["bindir", "D", "libdir"]))
 
     def test_subshell_expansion(self):
         value = kergoth.ShellValue("foo=$(echo bar)", self.d)
+        self.assertEqual(value.execs, set(["echo"]))
 
     def test_shell_unexpanded(self):
         value = kergoth.ShellValue('echo "${QT_BASE_NAME}"', self.d)
+        self.assertEqual(value.execs, set(["echo"]))
+        self.assertEqual(value.references, set(["QT_BASE_NAME"]))
 
     def test_incomplete_varexp_single_quotes(self):
         value = kergoth.ShellValue("sed -i -e 's:IP{:I${:g' $pc", self.d)
+        self.assertEqual(value.execs, set(["sed"]))
 
     def test_until(self):
         shellval = kergoth.ShellValue("until false; do echo true; done", self.d)
@@ -170,12 +178,16 @@ esac
 
     def test_assign_exec(self):
         value = kergoth.ShellValue("a=b c='foo bar' alpha 1 2 3", self.d)
+        self.assertEquals(value.execs, set(["alpha"]))
 
     def test_assign_newlines_exec(self):
         value = kergoth.ShellValue("a=b\nc='foo bar'\n alpha 1 2 3", self.d)
+        self.assertEquals(value.execs, set(["alpha"]))
 
     def test_redirect_to_file(self):
         value = kergoth.ShellValue("echo foo >${foo}/bar", self.d)
+        self.assertEquals(value.execs, set(["echo"]))
+        self.assertEquals(value.references, set(["foo"]))
 
     def test_heredoc(self):
         script = """
@@ -198,6 +210,10 @@ shadow_cv_passwd_dir=${bindir}
 END
         """
         value = kergoth.ShellValue(script, self.d)
+        self.assertEquals(value.references, set(["B", "SHADOW_MAILDIR",
+                                                 "SHADOW_MAILFILE", "SHADOW_UTMPDIR",
+                                                 "SHADOW_LOGDIR", "bindir"]))
+        self.assertEquals(value.execs, set(["cat"]))
 
     def test_incomplete_command_expansion(self):
         from pysh import pyshlex
@@ -205,7 +221,9 @@ END
 
     def test_rogue_dollarsign(self):
         self.d.setVar("D", "/tmp")
-        kergoth.ShellValue("install -d ${D}$", self.d)
+        value = kergoth.ShellValue("install -d ${D}$", self.d)
+        self.assertEqual(value.references, set(["D"]))
+        self.assertEqual(value.execs, set(["install"]))
 
 class TestContentsTracking(unittest.TestCase):
     def setUp(self):
@@ -279,6 +297,9 @@ class TestContentsTracking(unittest.TestCase):
 
         shellval = kergoth.ShellValue(self.shelldata, self.d)
         self.assertEquals(shellval.references, set(["somevar", "inverted"]))
+        self.assertEquals(shellval.execs, set(["bar", "echo", "heh", "moo",
+                                               "true", "false", "test", "aiee",
+                                               "inverted"]))
 
     def test_varrefs(self):
         self.d.setVar("FOO", "foo=oe_libinstall; eval $foo")
@@ -292,6 +313,19 @@ class TestContentsTracking(unittest.TestCase):
         value = kergoth.new_value("FOO", self.d)
         self.assertEqual(set(["oe_libinstall"]), value.references)
 
+class TestPython(unittest.TestCase):
+    def setUp(self):
+        self.d = bb.data.init()
+
+    def test_getvar_reference(self):
+        value = kergoth.PythonValue("bb.data.getVar('foo', d, True)", self.d)
+        self.assertEqual(value.references, set(["foo"]))
+        self.assertEqual(value.calls, set())
+
+    def test_var_reference(self):
+        value = kergoth.PythonValue("print('${FOO}')", self.d)
+        self.assertEqual(value.references, set(["FOO"]))
+        self.assertEqual(value.calls, set(["print"]))
 
 class TestSignatureGeneration(unittest.TestCase):
     def setUp(self):
