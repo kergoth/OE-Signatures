@@ -232,7 +232,7 @@ class ShellValue(Value):
         Value.parse(self)
         try:
             strvalue = str(self.components)
-        except (RecursionError, PythonExpansionError), exc:
+        except (RecursionError, PythonExpansionError):
             strvalue = self.value
 
         self.execs = self.parse_shell(strvalue)
@@ -471,7 +471,7 @@ class PythonValue(Value):
             flags = self.metadata.getVarFlags(var)
             if flags and var in self.calls and \
                "func" in flags and "python" in flags:
-                    self.references.add(var)
+                self.references.add(var)
 
 class PythonSnippet(PythonValue):
     """Lazy evaluation of a python snippet"""
