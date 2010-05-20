@@ -1,45 +1,38 @@
-# We need a hash of the metadata.  We cannot rely on the built in python
-# hash() method, which means we need to use hashlib.  To use that, we need to
-# supply it a bytestream/string, which means we should convert things into a
-# string, which means we need a more intelligent repr().  We want to ensure
-# that for objects which don't have a defined order, we show the arguments in
-# the repr in a defined order.
+BB_HASH_OUTPUT ?= "${TMPDIR}/signatures/${PF}.${SIGNATURE}"
 
 BB_HASH_BLACKLIST += "__* *DIR *_DIR_* PATH PWD BBPATH FILE PARALLEL_MAKE"
+BB_HASH_BLACKLSIT += "SIGNATURE"
 
 # These are blacklisted due to python exceptions
 BB_HASH_BLACKLIST += "PYTHON_DIR"
 
 python () {
-    d.setVar("__RECIPEDATA", d)
-}
-
-#SIGNATURE = "${@kergoth.recipe_signature(d.getVar('__RECIPEDATA', d) or d)}"
-
-python do_emit_signature () {
     import kergoth
-    signature = kergoth.Signature(d.getVar("__RECIPEDATA", False) or d)
-    bb.msg.note(1, None, bb.data.expand("${PF}: metadata signature is %s" % signature, d))
+    if d.getVar("__RUNQUEUE_DO_NOT_USE_EXTERNALLY", False):
+        try:
+            value = kergoth.Signature(d)
+            d.setVar("__SIGNATURE", value)
+            d.setVar("SIGNATURE", str(value))
+        except Exception, exc:
+            from traceback import format_exc
+            bb.fatal(format_exc(exc))
+
+    if d.getVar("BB_HASH_DEBUG", True):
+        deps = d.getVarFlag("do_build", "deps") or []
+        d.setVarFlag("do_build", "deps", deps + ["do_write_signature_all"])
 }
-do_emit_signature[nostamp] = "1"
-addtask emit_signature
 
-do_emit_signature_all[nostamp] = "1"
-do_emit_signature_all[recrdeptask] = "do_emit_signature"
-addtask emit_signature_all after do_emit_signature
-
-python do_emit_data () {
-    import pickle
-
-    d = d.getVar("__RECIPEDATA", False) or d
-    vars = {}
-    flags = {}
-    for key in d.keys():
-        if not key.startswith("__"):
-            vars[key] = d.getVar(key, False)
-            flags[key] = d.getVarFlags(key)
-    pickle.dump(vars, open(bb.data.expand("${TOPDIR}/signatures/${PF}.vars", d), "wb"))
-    pickle.dump(flags, open(bb.data.expand("${TOPDIR}/signatures/${PF}.flags", d), "wb"))
+python do_write_signature () {
+    import kergoth
+    items = d.getVar("__SIGNATURE", False)
+    output = d.getVar("BB_HASH_OUTPUT", True)
+    if output:
+        bb.mkdirhier(os.path.dirname(output))
+        f = open(output, "w")
+        for key, value in sorted(items.data.iteritems()):
+            f.write("%s = %s\n" % (key, kergoth.stable_repr(value)))
 }
-do_emit_data[nostamp] = "1"
-addtask emit_data
+addtask write_signature
+
+do_write_signature_all[recrdeptask] = "do_write_signature"
+addtask write_signature_all after do_write_signature
