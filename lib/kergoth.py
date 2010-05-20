@@ -370,6 +370,7 @@ class PythonValue(Value):
 
         getvars = ("d.getVar", "bb.data.getVar", "data.getVar")
         expands = ("d.expand", "bb.data.expand", "data.expand")
+        execs = ("bb.build.exec_func", "bb.build.exec_task")
 
         @classmethod
         def _compare_name(cls, strparts, node):
@@ -407,6 +408,7 @@ class PythonValue(Value):
 
         def __init__(self):
             self.var_references = set()
+            self.var_execs = set()
             self.direct_func_calls = set()
             ast.NodeVisitor.__init__(self)
 
@@ -442,6 +444,11 @@ class PythonValue(Value):
                     pass
                 else:
                     self.warn(node.func, node.args[0])
+            elif self.compare_name(self.execs, node.func):
+                if isinstance(node.args[0], ast.Str):
+                    self.var_execs.add(node.args[0].s)
+                else:
+                    self.warn(node.func, node.args[0])
             elif isinstance(node.func, ast.Name):
                 self.direct_func_calls.add(node.func.id)
 
@@ -458,6 +465,7 @@ class PythonValue(Value):
         self.visitor.visit(code)
 
         self.references.update(self.visitor.var_references)
+        self.references.update(self.visitor.var_execs)
         self.calls = self.visitor.direct_func_calls
         for var in self.metadata.keys():
             flags = self.metadata.getVarFlags(var)

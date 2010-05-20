@@ -323,6 +323,12 @@ class TestPython(unittest.TestCase):
         self.assertEqual(value.references, set(["FOO"]))
         self.assertEqual(value.calls, set(["foo"]))
 
+    def test_var_exec(self):
+        self.d.setVar("do_something", "echo 'hi mom! ${FOO}'")
+        self.d.setVarFlag("do_something", "func", True)
+        value = kergoth.PythonValue("bb.build.exec_func('do_something', d)", self.d)
+        self.assertEqual(value.references, set(["do_something"]))
+
 class TestSignatureGeneration(unittest.TestCase):
     def setUp(self):
         self.d = bb.data.init()
