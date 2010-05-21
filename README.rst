@@ -66,6 +66,10 @@ TODO
 
 - General
 
+  - Think about how best to handle the nested VariableRef issue.  If you have
+    a value ${${FOO} bar} and FOO is foo, ideally we'd resolve from bottom to
+    top and record each reference, so that e.g. in this case we know that we
+    reference both the FOO variable and the 'foo bar' variable.
   - Think about storing the PythonValue ast and utilizing it in PythonSnippet
     to compile the code from that, rather than having it re-parse the string.
     The 'compile' function can compile an ast object directly.
