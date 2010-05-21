@@ -47,6 +47,19 @@ TODO
     directly accessing the specific conditional variables they want (i.e.
     RDEPENDS_<pkg>).
 
+  - Implement one or more checking / auditing mechanisms to determine if the
+    Signature really does capture everything a task needs.
+    - In TaskStarted (assuming the event is fired with the post-createCopy
+      datastore for the task, and assuming its run within the task's process),
+      we can monkeypatch bb.data.getVar() and bb.data.expand() to gather up a
+      list of the variables the task really does use during its execution, and
+      compare that to what the Signature captured.
+    - An alternative approach would be to filter the datastore in TaskStarted,
+      removing everything the signature didn't capture, and seeing what blows
+      up.  The problem with this method is that it could not blow up, instead
+      just producing different output, so ideally to implement this we'd also
+      need to add capturing of task output for comparison.
+
   - Cache blacklist transformations
   - Do extensive profiling to improve performance
 
