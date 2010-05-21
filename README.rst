@@ -61,6 +61,22 @@ TODO
       just producing different output, so ideally to implement this we'd also
       need to add capturing of task output for comparison.
 
+  - Side effects are problem.  Python snippets which take input from the disk
+    won't be correctly captured in this signature, so variables which run
+    bb.which() to determine the correct location of a file will have their
+    components hashed -- that is, the snippet of python, not the output of the
+    snippet.  We may want to include the *output* of such snippets in the
+    signature, rather than their components.  Conceptually, this makes a
+    certain amount of sense.  Tasks aren't an issue, because we'll be adding
+    the ability to declare file input / output to tasks.
+
+    - Consider usages of FILESPATH.  OVERRIDE specific files may be used..
+      but at best FILESPATH and OVERRIDES will end up included in the
+      signature, which will pull in MACHINE, etc, even if no machine specific
+      files or metadata are utilized.  We may want to blacklist FILESPATH
+      and OVERRIDES, and find a way to hash the *resolved* paths for file://
+      URIs, perhaps the above suggested hashing of output of snippets.
+
   - Cache blacklist transformations
   - Do extensive profiling to improve performance
 
