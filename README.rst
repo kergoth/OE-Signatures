@@ -49,6 +49,7 @@ TODO
 
   - Implement one or more checking / auditing mechanisms to determine if the
     Signature really does capture everything a task needs.
+
     - In TaskStarted (assuming the event is fired with the post-createCopy
       datastore for the task, and assuming its run within the task's process),
       we can monkeypatch bb.data.getVar() and bb.data.expand() to gather up a
