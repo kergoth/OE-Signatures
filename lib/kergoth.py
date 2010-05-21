@@ -454,6 +454,7 @@ class PythonValue(Value):
 
     def __init__(self, value, metadata):
         self.visitor = self.ValueVisitor()
+        self.function_references = set()
         self.calls = None
 
         Value.__init__(self, value, metadata)
@@ -467,11 +468,13 @@ class PythonValue(Value):
         self.references.update(self.visitor.var_references)
         self.references.update(self.visitor.var_execs)
         self.calls = self.visitor.direct_func_calls
-        for var in self.metadata.keys():
-            flags = self.metadata.getVarFlags(var)
-            if flags and var in self.calls and \
-               "func" in flags and "python" in flags:
-                self.references.add(var)
+        if hasattr(bb.utils, "_context"):
+            context = bb.utils._context
+        else:
+            context = __builtins__
+        for var in self.calls:
+            if var in context:
+                self.function_references.add((var, context[var]))
 
 class PythonSnippet(PythonValue):
     """Lazy evaluation of a python snippet"""

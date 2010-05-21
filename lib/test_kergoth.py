@@ -329,6 +329,19 @@ class TestPython(unittest.TestCase):
         value = kergoth.PythonValue("bb.build.exec_func('do_something', d)", self.d)
         self.assertEqual(value.references, set(["do_something"]))
 
+    def test_function_reference(self):
+        if hasattr(bb.utils, "_context"):
+            context = bb.utils._context
+        else:
+            context = __builtins__
+
+        context["testfunc"] = lambda: bb.msg.note(1, None, "Hello, World!")
+        self.d.setVar("FOO", "bar")
+        value = kergoth.PythonValue("testfunc('${FOO}')", self.d)
+        self.assertEqual(value.references, set(["FOO"]))
+        self.assertEqual(value.function_references, set([("testfunc", context["testfunc"])]))
+        del context["testfunc"]
+
 class TestSignatureGeneration(unittest.TestCase):
     def setUp(self):
         self.d = bb.data.init()
