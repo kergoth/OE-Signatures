@@ -298,14 +298,24 @@ class TestContentsTracking(unittest.TestCase):
                                                "inverted"]))
 
     def test_varrefs(self):
+        self.d.setVar("oe_libinstall", "echo test")
         self.d.setVar("FOO", "foo=oe_libinstall; eval $foo")
         self.d.setVarFlag("FOO", "varrefs", "oe_libinstall")
         value = kergoth.new_value("FOO", self.d)
         self.assertEqual(set(["oe_libinstall"]), value.references)
 
     def test_varrefs_expand(self):
+        self.d.setVar("oe_libinstall", "echo test")
         self.d.setVar("FOO", "foo=oe_libinstall; eval $foo")
         self.d.setVarFlag("FOO", "varrefs", "${@'oe_libinstall'}")
+        value = kergoth.new_value("FOO", self.d)
+        self.assertEqual(set(["oe_libinstall"]), value.references)
+
+    def test_varrefs_wildcards(self):
+        self.d.setVar("oe_libinstall", "echo test")
+        self.d.setVar("FOO", "foo=oe_libinstall; eval $foo")
+        self.d.setVarFlag("FOO", "varrefs", "oe_*")
+        print("keys", self.d.keys())
         value = kergoth.new_value("FOO", self.d)
         self.assertEqual(set(["oe_libinstall"]), value.references)
 

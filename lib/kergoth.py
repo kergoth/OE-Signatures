@@ -548,7 +548,10 @@ def new_value(variable, metadata):
     if varrefs:
         refs = Value(varrefs, metadata)
         value.references.update(refs.references)
-        value.references.update(str(refs).split())
+        patterns = str(refs).split()
+        for key in metadata.keys():
+            if any(fnmatchcase(key, pat) for pat in patterns):
+                value.references.add(key)
 
     _value_cache[cache_key] = value
     return value
