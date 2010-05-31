@@ -70,7 +70,7 @@ class TestExpansions(unittest.TestCase):
         except kergoth.PythonExpansionError, exc:
             self.assertEqual(len(exc.path), 2)
         else:
-            raise Exception("Did not raise expected PythonExpansionError")
+            self.fail("Did not raise expected PythonExpansionError")
 
     def test_value_containing_value(self):
         otherval = kergoth.Value("${@d.getVar('foo', True) + ' ${bar}'}", self.d)
@@ -111,13 +111,23 @@ class TestExpansions(unittest.TestCase):
             self.assertEqual(exc.variable, "FOO")
             self.assertTrue(kergoth.new_value("BAR", self.d) in exc.path)
         else:
-            raise Exception("RecursionError not raised")
+            self.fail("RecursionError not raised")
 
+class TestMemoize(unittest.TestCase):
+    def test_memoized(self):
+        d = bb.data.init()
+        d.setVar("FOO", "bar")
+        self.assertEqual(kergoth.new_value("FOO", d),
+                         kergoth.new_value("FOO", d))
 
-def test_memoize():
-    d = bb.data.init()
-    d.setVar("FOO", "bar")
-    assert(kergoth.new_value("FOO", d) is kergoth.new_value("FOO", d))
+    def test_not_memoized(self):
+        d1 = bb.data.init()
+        d2 = bb.data.init()
+        d1.setVar("FOO", "bar")
+        d2.setVar("FOO", "bar")
+        self.assertNotEqual(kergoth.new_value("FOO", d1),
+                            kergoth.new_value("FOO", d2))
+
 
 class TestShell(unittest.TestCase):
     def setUp(self):
@@ -315,14 +325,18 @@ class TestContentsTracking(unittest.TestCase):
         self.d.setVar("oe_libinstall", "echo test")
         self.d.setVar("FOO", "foo=oe_libinstall; eval $foo")
         self.d.setVarFlag("FOO", "varrefs", "oe_*")
-        print("keys", self.d.keys())
         value = kergoth.new_value("FOO", self.d)
         self.assertEqual(set(["oe_libinstall"]), value.references)
 
 class TestPython(unittest.TestCase):
     def setUp(self):
         self.d = bb.data.init()
-
+        if hasattr(bb.utils, "_context"):
+            self.context = bb.utils._context
+        else:
+            import __builtin__
+            self.context = __builtin__.__dict__
+        
     def test_getvar_reference(self):
         value = kergoth.PythonValue("bb.data.getVar('foo', d, True)", self.d)
         self.assertEqual(value.references, set(["foo"]))
@@ -334,23 +348,41 @@ class TestPython(unittest.TestCase):
         self.assertEqual(value.calls, set(["foo"]))
 
     def test_var_exec(self):
-        self.d.setVar("do_something", "echo 'hi mom! ${FOO}'")
-        self.d.setVarFlag("do_something", "func", True)
-        value = kergoth.PythonValue("bb.build.exec_func('do_something', d)", self.d)
-        self.assertEqual(value.references, set(["do_something"]))
+        for etype in ("func", "task"):
+            self.d.setVar("do_something", "echo 'hi mom! ${FOO}'")
+            self.d.setVarFlag("do_something", etype, True)
+            value = kergoth.PythonValue("bb.build.exec_func('do_something', d)", 
+                                        self.d)
+            self.assertEqual(value.references, set(["do_something"]))
 
     def test_function_reference(self):
-        if hasattr(bb.utils, "_context"):
-            context = bb.utils._context
-        else:
-            context = __builtins__
-
-        context["testfunc"] = lambda: bb.msg.note(1, None, "Hello, World!")
-        self.d.setVar("FOO", "bar")
+        self.context["testfunc"] = lambda msg: bb.msg.note(1, None, msg)
+        self.d.setVar("FOO", "Hello, World!")
         value = kergoth.PythonValue("testfunc('${FOO}')", self.d)
         self.assertEqual(value.references, set(["FOO"]))
-        self.assertEqual(value.function_references, set([("testfunc", context["testfunc"])]))
-        del context["testfunc"]
+        self.assertEqual(value.function_references, 
+                         set([("testfunc", self.context["testfunc"])]))
+        del self.context["testfunc"]
+
+    def test_qualified_function_reference(self):
+        value = kergoth.PythonValue("time.time()", self.d)
+        self.assertEqual(value.function_references, 
+                         set([("time.time", self.context["time"].time)]))
+
+    def test_qualified_function_reference_nested(self):
+        value = kergoth.PythonValue("time.strftime('%Y%m%d',time.gmtime())", 
+                                     self.d)
+        self.assertEqual(value.function_references, 
+                         set([("time.strftime", self.context["time"].strftime), 
+                              ("time.gmtime", self.context["time"].gmtime)]))
+
+    def test_function_reference_chained(self):
+        self.context["testget"] = lambda: "\tstrip me     "
+        value = kergoth.PythonSnippet("testget().strip()", self.d)
+        value.resolve()
+        self.assertEqual(value.function_references, 
+                         set([("testget", self.context["testget"])]))
+        del self.context["testget"]
 
 class TestSignatureGeneration(unittest.TestCase):
     def setUp(self):
@@ -399,28 +431,34 @@ class TestSignatureGeneration(unittest.TestCase):
         self.d.setVar("GNOME_TERMCMD", "gnome-terminal --disable-factory -t \"$TERMWINDOWTITLE\"")
         self.d.setVar("TERMCMD", "${GNOME_TERMCMD}")
         signature = kergoth.Signature(self.d, keys=["do_devshell"])
-        signature.data_string
+        self.assertEquals(signature.md5.digest(), 
+                          'h HM\xea1\x90\xdeB[iV\xc7\xd9@3')
 
+class TestOEData(unittest.TestCase):
+    import pickle
 
-import pickle
-def test_oedata():
-    import bb.fetch
-    import bb.parse
-    import bb.msg
-    import bb.utils
-    import os.path
+    def test_shasum(self):
+        import bb.fetch
+        import bb.parse
+        import bb.msg
+        import bb.utils
+        import os.path
 
-    if not os.path.exists("shasum-native-1.0-r1.vars"):
-        return
+        if not os.path.exists("shasum-native-1.0-r1.vars"):
+            return
 
-    d = bb.data.init()
-    d.setVar("__RECIPEDATA", d)
-    d.setVar("BB_HASH_BLACKLIST", "__* *DIR *_DIR_* PATH PWD BBPATH FILE PARALLEL_MAKE")
-    vars = pickle.load(open("shasum-native-1.0-r1.vars", "rb"))
-    flags = pickle.load(open("shasum-native-1.0-r1.flags", "rb"))
-    for key, val in vars.iteritems():
-        d.setVar(key, val)
-        varflags = flags[key]
-        if varflags:
-            d.setVarFlags(key, flags[key])
-    print(kergoth.Signature(d))
+        d = bb.data.init()
+        d.setVar("__RECIPEDATA", d)
+        d.setVar("BB_HASH_BLACKLIST", "__* *DIR *_DIR_* PATH PWD BBPATH FILE PARALLEL_MAKE")
+        vars = pickle.load(open("shasum-native-1.0-r1.vars", "rb"))
+        flags = pickle.load(open("shasum-native-1.0-r1.flags", "rb"))
+        for key, val in vars.iteritems():
+            d.setVar(key, val)
+            varflags = flags[key]
+            if varflags:
+                d.setVarFlags(key, flags[key])
+        print(kergoth.Signature(d))
+
+if __name__ == "__main__":
+    unittest.main()
+

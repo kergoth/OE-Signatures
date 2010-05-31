@@ -451,6 +451,18 @@ class PythonValue(Value):
                     self.warn(node.func, node.args[0])
             elif isinstance(node.func, ast.Name):
                 self.direct_func_calls.add(node.func.id)
+            elif isinstance(node.func, ast.Attribute):
+                # We must have a qualified name.  Therefore we need
+                # to walk the chain of 'Attribute' nodes to determine
+                # the qualification.
+                attr_node = node.func.value
+                id = node.func.attr
+                while isinstance(attr_node, ast.Attribute):
+                    id += "." + attr_node.attr
+                    attr_node = attr_node.value
+                if isinstance(attr_node, ast.Name):
+                    id = attr_node.id + "." + id
+                self.direct_func_calls.add(id)
 
     def __init__(self, value, metadata):
         self.visitor = self.ValueVisitor()
@@ -468,13 +480,12 @@ class PythonValue(Value):
         self.references.update(self.visitor.var_references)
         self.references.update(self.visitor.var_execs)
         self.calls = self.visitor.direct_func_calls
-        if hasattr(bb.utils, "_context"):
-            context = bb.utils._context
-        else:
-            context = __builtins__
         for var in self.calls:
-            if var in context:
-                self.function_references.add((var, context[var]))
+            try:
+                func_obj = bb.utils.better_eval(var, {})
+                self.function_references.add((var, func_obj))
+            except NameError:
+                pass
 
 class PythonSnippet(PythonValue):
     """Lazy evaluation of a python snippet"""
