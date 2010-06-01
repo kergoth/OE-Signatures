@@ -1,24 +1,21 @@
 OE Signatures
 =============
 
-This bitbake layer (OpenEmbedded Overlay) exists to test some code which I've
-thrown together.  This code changes the way variables are expanded, to allow
-more information to be retained easily about what it references.  It also adds
-tracking of what shell functions are called by other shell functions, and what
-variables are used from the metadata by python code.
+This repository holds code which revamps the way variables are expanded, in
+order to add variable reference tracking.  This tracking includes direct
+references, as well as getVar calls from python code, shell function
+executions of other shell functions, and so on.
 
-There are multiple purposes of this, but the most immediate is to implement
+There are multiple purposes to this, but the most immediate is to implement
 intelligent signature/hash generation of the metadata (or chunks of the
 metadata).  This is necessary in order to provide sane binary caching support,
 and in the future, will allow bitbake to move away from the "stamp" concept
 entirely, instead relying on tracking of the input and output of tasks, and
 the pieces of the metadata they use.
 
-Next, this should allow us, in the long term, to allow one to edit a
-configuration file without reparsing the world.  Of course, Holger's ast work
-is a step in the right direction for that also, but this would allow us to
-bypass re-execution of the ast statements as well, simply letting 'dirty'
-state information flow through the variable references.
+It is my belief that this can lead to us avoiding reparsing everything when a
+configuration file changes, as we could record 'dirty' state information and
+propogate it through the variable references, to update the changed variables.
 
 
 Recommendations for Exception Handling
@@ -40,12 +37,13 @@ TODO
 
 - Top Priority Tasks
 
-  - Finish populating all necessary varrefs flags for the packaging classes in
-    OpenEmbedded
   - Audit all OpenEmbedded metadata for changes to OVERRIDES followed by calls
     to update_data.  These cases can almost certainly be replaced with
     directly accessing the specific conditional variables they want (i.e.
-    RDEPENDS_<pkg>).
+    RDEPENDS_<pkg>).  If not, we need to use the wildcards support and add the
+    variables to varrefs (i.e. do_foo[varrefs] = "RDEPENDS_*").
+  - Finish populating all remaining needed varrefs flags for the packaging
+    classes in OpenEmbedded
 
   - Implement one or more checking / auditing mechanisms to determine if the
     Signature really does capture everything a task needs.
@@ -61,23 +59,10 @@ TODO
       just producing different output, so ideally to implement this we'd also
       need to add capturing of task output for comparison.
 
-  - Side effects are problem.  Python snippets which take input from the disk
-    won't be correctly captured in this signature, so variables which run
-    bb.which() to determine the correct location of a file will have their
-    components hashed -- that is, the snippet of python, not the output of the
-    snippet.  We may want to include the *output* of such snippets in the
-    signature, rather than their components.  Conceptually, this makes a
-    certain amount of sense.  Tasks aren't an issue, because we'll be adding
-    the ability to declare file input / output to tasks.
-
-    - Consider usages of FILESPATH.  OVERRIDE specific files may be used..
-      but at best FILESPATH and OVERRIDES will end up included in the
-      signature, which will pull in MACHINE, etc, even if no machine specific
-      files or metadata are utilized.  We may want to blacklist FILESPATH
-      and OVERRIDES, and find a way to hash the *resolved* paths for file://
-      URIs, perhaps the above suggested hashing of output of snippets.
-
-  - Cache blacklist transformations
+  - file:// URIs are a concern.  They traverse FILESPATH in bitbake code,
+    which won't be accounted for in the signature code, unless we hardcode
+    knowledge about variables referenced by bitbake API functions, or we parse
+    the bitbake package with ast and analyze the modules.
   - Do extensive profiling to improve performance
 
 - General

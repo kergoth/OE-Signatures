@@ -402,7 +402,7 @@ class TestSignatureGeneration(unittest.TestCase):
         self.d["blacklistedvar"] = "blacklistedvalue"
         self.d["testbl"] = "${@5} foo ${blacklistedvar} bar"
         signature = kergoth.Signature(self.d, keys=["testbl"])
-        self.assertEqual(signature.data_string, "{'testbl': Value([PythonSnippet(['5']), ' foo ', '${blacklistedvar}', ' bar'])}")
+        self.assertEqual(signature.data_string, "{'testbl': Value(['5', ' foo ', '${blacklistedvar}', ' bar'])}")
 
     def test_signature_only_blacklisted(self):
         self.d["anotherval"] = "${blacklistedvar}"
@@ -413,6 +413,16 @@ class TestSignatureGeneration(unittest.TestCase):
         self.d["someval"] = "${undefinedvar} ${blacklistedvar} meh"
         signature = kergoth.Signature(self.d, keys=["someval"])
         self.assertEquals(signature.data_string, "{'someval': Value([VariableRef(['undefinedvar']), ' ', '${blacklistedvar}', ' meh'])}")
+
+    def test_signature_python_snippet(self):
+        locals = {}
+        self.d.setVar("testvar", "${@x()}")
+        bb.utils.simple_exec("globals()['x'] = lambda: 'alpha'", locals)
+        signature = kergoth.Signature(self.d, keys=["testvar"])
+        print(signature.data_string)
+        bb.utils.simple_exec("globals()['x'] = lambda: 'beta'", locals)
+        signature2 = kergoth.Signature(self.d, keys=["testvar"])
+        self.assertNotEqual(signature.data, signature2.data)
 
     def test_signature_oe_devshell(self):
         self.d.setVar("do_devshell", "devshell_do_devshell")

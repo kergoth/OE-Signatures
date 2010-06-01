@@ -692,10 +692,9 @@ class Signature(object):
         into their unexpanded forms.
         """
 
-        if not self.blacklist:
-            return item
-
-        if isinstance(item, Value):
+        if isinstance(item, PythonSnippet):
+            return str(item)
+        elif isinstance(item, Value):
             transformed = Components(self.transform_blacklisted(i) for i in item.components)
             if transformed != item.components:
                 return item.__class__(transformed, self.metadata)
