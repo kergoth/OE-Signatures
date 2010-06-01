@@ -222,8 +222,7 @@ END
         self.assertEquals(value.execs, set(["cat"]))
 
     def test_incomplete_command_expansion(self):
-        from pysh import pyshlex
-        self.assertRaises(pyshlex.NeedMore, kergoth.ShellValue, "cp foo`", self.d)
+        self.assertRaises(kergoth.ShellSyntaxError, kergoth.ShellValue, "cp foo`", self.d)
 
     def test_rogue_dollarsign(self):
         self.d.setVar("D", "/tmp")

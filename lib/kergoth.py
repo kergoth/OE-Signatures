@@ -250,7 +250,11 @@ class ShellValue(Value):
         commands it executes.
         """
 
-        tokens, _ = pyshyacc.parse(value, eof=True, debug=False)
+        try:
+            tokens, _ = pyshyacc.parse(value, eof=True, debug=False)
+        except pyshlex.NeedMore:
+            raise ShellSyntaxError("Unexpected EOF")
+
         for token in tokens:
             self.process_tokens(token)
         cmds = set(cmd for cmd in self.execs
