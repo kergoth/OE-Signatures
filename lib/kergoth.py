@@ -24,7 +24,7 @@ class RecursionError(RuntimeError):
     def __str__(self):
         msg = "Recursive variable reference for %s" % self.variable
         if self.path:
-            msg += " via %s" % " -> ".join(stable_repr(v) for v in self.path)
+            msg += " via %s" % self.path
 
         return msg
 
@@ -37,8 +37,13 @@ class PythonExpansionError(Exception):
     def __str__(self):
         msg = "'%s' while resolving %s" % (self.exception, stable_repr(self.node))
         if self.path:
-            msg += " via %s" % " -> ".join(stable_repr(v) for v in self.path)
+            msg += " via %s" % self.path
         return msg
+
+
+class Path(list):
+    def __str__(self):
+        return " -> ".join(stable_repr(v) for v in self.path)
 
 
 class Components(list):
@@ -58,11 +63,12 @@ class Components(list):
 
     def resolve(self, path = None):
         if path is None:
-            path = []
+            path = Path()
         return "".join(self._resolve(path))
 
     def __hash__(self):
         return hash("Components(%s)" % ", ".join(repr(c) for c in self))
+
 
 class VariableRef(object):
     """Reference to a variable.  The variable name is supplied as a Components
@@ -82,7 +88,7 @@ class VariableRef(object):
 
     def resolve(self, path = None):
         if path is None:
-            path = []
+            path = Path()
 
         name = self.components.resolve(path)
         value = new_value(name, self.metadata)
@@ -153,7 +159,7 @@ class Value(object):
 
     def resolve(self, path = None):
         if path is None:
-            path = []
+            path = Path()
         path.append(self)
         resolved = self.components.resolve(path)
         path.pop()
