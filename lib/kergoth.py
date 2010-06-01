@@ -40,27 +40,6 @@ class PythonExpansionError(Exception):
             msg += " via %s" % " -> ".join(stable_repr(v) for v in self.path)
         return msg
 
-class Memoized(object):
-    """Decorator that caches a function's return value each time it is called.
-    If called later with the same arguments, the cached value is returned, and
-    not re-evaluated.
-    """
-    def __init__(self, func):
-        self.func = func
-        self.cache = {}
-
-    def __call__(self, *args):
-        key = pickle.dumps(args)
-        try:
-            return self.cache[key]
-        except KeyError:
-            self.cache[key] = value = self.func(*args)
-            return value
-
-    def __repr__(self):
-        """Return the function's docstring."""
-        return self.func.__doc__
-
 
 class Components(list):
     """A list of components, which concatenates itself upon str(), and runs
@@ -122,6 +101,15 @@ class Value(object):
     internal Components."""
 
     variable_ref = re.compile(r"(\$\{|\})")
+    memory = {}
+
+    def __new__(cls, value, metadata):
+        key = (cls, value, id(metadata))
+        if key in cls.memory:
+            return cls.memory[key]
+        else:
+            cls.memory[key] = value = object.__new__(cls)
+            return value
 
     def __init__(self, value, metadata):
         if not isinstance(value, basestring):
@@ -540,11 +528,6 @@ def new_value(variable, metadata):
     if strvalue is None:
         return "${%s}" % variable
 
-    cache_key = (strvalue, id(metadata))
-    value = _value_cache.get(cache_key)
-    if value is not None:
-        return value
-
     if metadata.getVarFlag(variable, "func"):
         if metadata.getVarFlag(variable, "python"):
             value = PythonValue(dedent_python(strvalue.expandtabs()), metadata)
@@ -555,7 +538,6 @@ def new_value(variable, metadata):
                 raise RuntimeError("Ran out of input while parsing shell for %s" % variable)
             except ShellSyntaxError, exc:
                 raise RuntimeError("Syntax error parsing shell for %s: %s" % (variable, exc))
-
     else:
         value = Value(strvalue, metadata)
 
@@ -568,7 +550,6 @@ def new_value(variable, metadata):
             if any(fnmatchcase(key, pat) for pat in patterns):
                 value.references.add(key)
 
-    _value_cache[cache_key] = value
     return value
 
 def stable_repr(value):
