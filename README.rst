@@ -37,36 +37,25 @@ TODO
 
 - Top Priority Tasks
 
-  - Audit all OpenEmbedded metadata for changes to OVERRIDES followed by calls
-    to update_data.  These cases can almost certainly be replaced with
-    directly accessing the specific conditional variables they want (i.e.
-    RDEPENDS_<pkg>).  If not, we need to use the wildcards support and add the
-    variables to varrefs (i.e. do_foo[varrefs] = "RDEPENDS_*").
-  - Finish populating all remaining needed varrefs flags for the packaging
-    classes in OpenEmbedded
-
-  - Implement one or more checking / auditing mechanisms to determine if the
-    Signature really does capture everything a task needs.
-
-    - In TaskStarted (assuming the event is fired with the post-createCopy
-      datastore for the task, and assuming its run within the task's process),
-      we can monkeypatch bb.data.getVar() and bb.data.expand() to gather up a
-      list of the variables the task really does use during its execution, and
-      compare that to what the Signature captured.
-    - An alternative approach would be to filter the datastore in TaskStarted,
-      removing everything the signature didn't capture, and seeing what blows
-      up.  The problem with this method is that it could not blow up, instead
-      just producing different output, so ideally to implement this we'd also
-      need to add capturing of task output for comparison.
-
-  - file:// URIs are a concern.  They traverse FILESPATH in bitbake code,
-    which won't be accounted for in the signature code, unless we hardcode
-    knowledge about variables referenced by bitbake API functions, or we parse
-    the bitbake package with ast and analyze the modules.
+  - Complete the auditing mechanism when compares the list of variables the
+    signature believes are referenced to the variables actually referenced
+    when executing tasks.
+  - Finish populating all remaining needed varrefs flags for OE per the
+    current warnings.
   - Do extensive profiling to improve performance
 
 - General
 
+  - Revisit file:// URI usage and FILESPATH -- ideally, we can avoid every
+    usage of FILESPATH and OVERRIDES pulling in MACHINE, by capturing the
+    resolved versions of the uris to actual disk paths in the signature.
+  - We need a way to handle variable references from code in the bb and oe
+    python packages.  Either we try to read in the .py files, compile to an
+    ast, and analyze the functions from those that we call, or we need to set
+    the necessary varrefs explicitly.  And if we set it explicitly, either we
+    need to set it for every variable that calls the function, or we need to
+    store, somewhere, a mapping of bb/oe function to a list of additional
+    varrefs.
   - Think about how best to handle the nested VariableRef issue.  If you have
     a value ${${FOO} bar} and FOO is foo, ideally we'd resolve from bottom to
     top and record each reference, so that e.g. in this case we know that we
