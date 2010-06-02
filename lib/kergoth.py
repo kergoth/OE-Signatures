@@ -408,6 +408,7 @@ class PythonValue(Value):
             self.var_references = set()
             self.var_execs = set()
             self.direct_func_calls = set()
+            self.imports = set()
             ast.NodeVisitor.__init__(self)
 
         @classmethod
@@ -425,6 +426,10 @@ class PythonValue(Value):
             else:
                 bb.msg.debug(1, None, "Warning: in call to '%s', argument '%s' is not a literal" %
                                      (funcstr, argstr))
+
+        def visit_Import(self, node):
+            self.imports.update(set(val.asname or val.name for val in node.names))
+        visit_ImportFrom = visit_Import
 
         def visit_Call(self, node):
             ast.NodeVisitor.generic_visit(self, node)
@@ -467,6 +472,7 @@ class PythonValue(Value):
         self.visitor.value = self
         self.function_references = set()
         self.calls = None
+        self.imports = None
 
         Value.__init__(self, value, metadata)
 
@@ -479,6 +485,7 @@ class PythonValue(Value):
         self.references.update(self.visitor.var_references)
         self.references.update(self.visitor.var_execs)
         self.calls = self.visitor.direct_func_calls
+        self.imports = self.visitor.imports
         for var in self.calls:
             try:
                 func_obj = bb.utils.better_eval(var, {})

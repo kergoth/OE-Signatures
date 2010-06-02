@@ -383,6 +383,26 @@ class TestPython(unittest.TestCase):
                          set([("testget", self.context["testget"])]))
         del self.context["testget"]
 
+class TestPythonImports(unittest.TestCase):
+    def setUp(self):
+        self.d = bb.data.init()
+
+    def test_import(self):
+        value = kergoth.PythonValue("import time", self.d)
+        self.assertEqual(value.imports, set(["time"]))
+
+    def test_import_package_module(self):
+        value = kergoth.PythonValue("import os.path", self.d)
+        self.assertEqual(value.imports, set(["os.path"]))
+
+    def test_import_from(self):
+        value = kergoth.PythonValue("from os import path", self.d)
+        self.assertEqual(value.imports, set(["path"]))
+
+    def test_import_as(self):
+        value = kergoth.PythonValue("from os import path as foo", self.d)
+        self.assertEqual(value.imports, set(["foo"]))
+
 class TestSignatureGeneration(unittest.TestCase):
     def setUp(self):
         self.d = bb.data.init()
