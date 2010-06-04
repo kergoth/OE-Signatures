@@ -548,6 +548,10 @@ def new_value(variable, metadata):
     else:
         value = Value(strvalue, metadata)
 
+    dirs = metadata.getVarFlag(variable, "dirs")
+    if dirs:
+        value.references.update(Value(dirs, metadata).references)
+
     varrefs = metadata.getVarFlag(variable, "varrefs")
     if varrefs:
         refs = Value(varrefs, metadata)
