@@ -9,9 +9,7 @@ from fnmatch import fnmatchcase
 from itertools import chain
 from collections import deque
 from pysh import pyshyacc, pyshlex
-import bb.msg
-import bb.data
-import bb.utils
+from bb import msg, utils
 
 from pysh.sherrors import ShellSyntaxError
 
@@ -21,11 +19,10 @@ class RecursionError(RuntimeError):
         self.path = path
 
     def __str__(self):
-        msg = "Recursive variable reference for %s" % self.variable
+        string = "Recursive variable reference for %s" % self.variable
         if self.path:
-            msg += " via %s" % self.path
-
-        return msg
+            string += " via %s" % self.path
+        return string
 
 class PythonExpansionError(Exception):
     def __init__(self, exception, node, path):
@@ -34,10 +31,10 @@ class PythonExpansionError(Exception):
         self.path = path
 
     def __str__(self):
-        msg = "'%s' while resolving %s" % (self.exception, stable_repr(self.node))
+        string = "'%s' while resolving %s" % (self.exception, stable_repr(self.node))
         if self.path:
-            msg += " via %s" % self.path
-        return msg
+            string += " via %s" % self.path
+        return string
 
 
 class Path(list):
@@ -342,7 +339,7 @@ class ShellValue(Value):
 
                 cmd = word[1]
                 if cmd.startswith("$"):
-                    bb.msg.debug(1, None, "Warning: execution of non-literal command '%s'" % cmd)
+                    msg.debug(1, None, "Warning: execution of non-literal command '%s'" % cmd)
                 elif cmd == "eval":
                     command = " ".join(word for _, word in words[1:])
                     self.parse_shell(command)
@@ -420,9 +417,9 @@ class PythonValue(Value):
                 funcstr = codegen.to_source(func)
                 argstr = codegen.to_source(arg)
             except TypeError:
-                bb.msg.debug(2, None, "Failed to convert function and argument to source form")
+                msg.debug(2, None, "Failed to convert function and argument to source form")
             else:
-                bb.msg.debug(1, None, "Warning: in call to '%s', argument '%s' is not a literal" %
+                msg.debug(1, None, "Warning: in call to '%s', argument '%s' is not a literal" %
                                      (funcstr, argstr))
 
         def visit_Call(self, node):
@@ -480,7 +477,7 @@ class PythonValue(Value):
         self.calls = self.visitor.direct_func_calls
         for var in self.calls:
             try:
-                func_obj = bb.utils.better_eval(var, {})
+                func_obj = utils.better_eval(var, {})
                 self.function_references.add((var, func_obj))
             except NameError:
                 pass
@@ -492,7 +489,7 @@ class PythonSnippet(PythonValue):
         code = PythonValue.resolve(self, path)
         codeobj = compile(code.strip(), "<expansion>", "eval")
         try:
-            value = str(bb.utils.better_eval(codeobj, {"d": self.metadata}))
+            value = str(utils.better_eval(codeobj, {"d": self.metadata}))
         except Exception, exc:
             raise PythonExpansionError(exc, self, path)
         return Value(value, self.metadata).resolve(path)
@@ -662,7 +659,7 @@ class Signature(object):
                     value = self.transform_blacklisted(new_value(key, self.metadata))
                 except (SyntaxError, ShellSyntaxError, NotImplementedError,
                         PythonExpansionError, RecursionError), exc:
-                    bb.msg.error(None, "Unable to parse %s, excluding from signature: %s" %
+                    msg.error(None, "Unable to parse %s, excluding from signature: %s" %
                                  (key, exc))
                 else:
                     yield key, value
