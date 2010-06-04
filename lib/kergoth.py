@@ -5,11 +5,10 @@ import re
 import codegen
 import ast
 import hashlib
-import pickle
 from fnmatch import fnmatchcase
 from itertools import chain
 from collections import deque
-from pysh import pyshyacc, pyshlex, sherrors
+from pysh import pyshyacc, pyshlex
 import bb.msg
 import bb.data
 import bb.utils
@@ -43,7 +42,7 @@ class PythonExpansionError(Exception):
 
 class Path(list):
     def __str__(self):
-        return " -> ".join(stable_repr(v) for v in self.path)
+        return " -> ".join(stable_repr(v) for v in self)
 
 
 class Components(list):
