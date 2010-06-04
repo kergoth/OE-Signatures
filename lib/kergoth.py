@@ -435,7 +435,7 @@ class PythonValue(Value):
                     self.warn(node.func, node.args[0])
             elif self.compare_name(self.expands, node.func):
                 if isinstance(node.args[0], ast.Str):
-                    value = Value(node.args[0].s, bb.data.init())
+                    value = Value(node.args[0].s, self.value.metadata)
                     self.var_references.update(value.references)
                 elif isinstance(node.args[0], ast.Call) and \
                      self.compare_name(self.getvars, node.args[0].func):
@@ -464,6 +464,7 @@ class PythonValue(Value):
 
     def __init__(self, value, metadata):
         self.visitor = self.ValueVisitor()
+        self.visitor.value = self
         self.function_references = set()
         self.calls = None
 
