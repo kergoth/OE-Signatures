@@ -11,6 +11,8 @@ from collections import deque
 from pysh import pyshyacc, pyshlex
 from bb import msg, utils
 
+msg.set_debug_level(0)
+
 from pysh.sherrors import ShellSyntaxError
 
 class RecursionError(RuntimeError):
