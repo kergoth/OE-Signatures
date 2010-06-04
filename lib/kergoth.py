@@ -400,10 +400,11 @@ class PythonValue(Value):
             else:
                 return any(cls.compare_name(item, node) for item in value)
 
-        def __init__(self):
+        def __init__(self, value):
             self.var_references = set()
             self.var_execs = set()
             self.direct_func_calls = set()
+            self.value = value
             ast.NodeVisitor.__init__(self)
 
         @classmethod
@@ -450,17 +451,16 @@ class PythonValue(Value):
                 # to walk the chain of 'Attribute' nodes to determine
                 # the qualification.
                 attr_node = node.func.value
-                id = node.func.attr
+                identifier = node.func.attr
                 while isinstance(attr_node, ast.Attribute):
-                    id += "." + attr_node.attr
+                    identifier += "." + attr_node.attr
                     attr_node = attr_node.value
                 if isinstance(attr_node, ast.Name):
-                    id = attr_node.id + "." + id
-                self.direct_func_calls.add(id)
+                    identifier = attr_node.id + "." + identifier
+                self.direct_func_calls.add(identifier)
 
     def __init__(self, value, metadata):
-        self.visitor = self.ValueVisitor()
-        self.visitor.value = self
+        self.visitor = self.ValueVisitor(self)
         self.function_references = set()
         self.calls = None
 
