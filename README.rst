@@ -37,12 +37,12 @@ TODO
 
 - Top Priority Tasks
 
-  - Complete the auditing mechanism when compares the list of variables the
-    signature believes are referenced to the variables actually referenced
-    when executing tasks.
   - Finish populating all remaining needed varrefs flags for OE per the
-    current warnings.
+    current warnings, and per the task variable tracking comparison.
   - Do extensive profiling to improve performance
+  - Alter BitBake to store the methodpool functions and event handlers in the
+    metadata, in addition to storing the function objects in their respective
+    stores.
 
 - General
 
@@ -88,9 +88,6 @@ TODO
     or should the original know something about the layering?  I expect the
     former, but needs thought.
   - Longer term: potentially construct non-string values based on flags.
-  - Revamp the methodpool functions.  We can't have them only in the
-    methodpool as python objects, we need to retain an association with the
-    metadata variables.
 
 - Cleanup
 
