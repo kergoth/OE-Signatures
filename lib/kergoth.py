@@ -477,11 +477,12 @@ class PythonValue(Value):
         self.references.update(self.visitor.var_references)
         self.references.update(self.visitor.var_execs)
         self.calls = self.visitor.direct_func_calls
+        env = {}
         for var in self.calls:
             try:
-                func_obj = utils.better_eval(var, {})
+                func_obj = utils.better_eval(var, env)
                 self.function_references.add((var, func_obj))
-            except NameError:
+            except (NameError, AttributeError):
                 pass
 
 class PythonSnippet(PythonValue):
