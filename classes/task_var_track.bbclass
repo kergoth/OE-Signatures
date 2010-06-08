@@ -7,6 +7,9 @@ python track_task_varrefs () {
     from pickle import UnpicklingError
     import shelve
 
+    # NOTE: This is hardcoded because at the moment the Task* events don't
+    # bring along a reference to the task metadata.
+    varrefs_fn = "/home/kergoth/Code/oe/varrefs.shelf"
     excluded = ("do_display_shelf", "do_write_signature",
                 "do_write_signature_all")
 
@@ -27,20 +30,25 @@ python track_task_varrefs () {
     def un_monkey_patch(e):
         if "orig" not in __builtins__ or e._task in excluded:
             return
-        shelf = shelve.open("/home/kergoth/Code/oe/varrefs.shelf")
+
+        monitored = bb.data_smart.DataSmart.getVar.data
+        bb.data_smart.DataSmart.getVar = __builtins__["orig"]
+        del __builtins__["orig"]
+
+        shelf = shelve.open(varrefs_fn)
         if shelf.has_key(e._task):
-            try:
-                data = set(shelf[e._task])
-            except UnpicklingError:
-                data = set()
+            data = set(shelf[e._task])
         else:
             data = set()
 
-        data.update(bb.data_smart.DataSmart.getVar.data[e._task])
+        if data:
+            diff = data.difference(monitored[e._task])
+            if diff:
+                bb.note("Adding %s to the varrefs of %s" % (" ".join(diff), e._task))
+
+        data.update(monitored[e._task])
         shelf[e._task] = data
         shelf.close()
-        bb.data_smart.DataSmart.getVar = __builtins__["orig"]
-        del __builtins__["orig"]
 
     if isinstance(e, bb.build.TaskStarted):
         try:
