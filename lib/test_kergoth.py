@@ -368,6 +368,11 @@ class TestPython(unittest.TestCase):
         self.assertEqual(value.function_references, 
                          set([("time.time", self.context["time"].time)]))
 
+    def test_qualified_function_reference_2(self):
+        value = kergoth.PythonValue("os.path.dirname('/foo/bar')", self.d)
+        self.assertEqual(value.function_references,
+                         set([("os.path.dirname", self.context["os"].path.dirname)]))
+
     def test_qualified_function_reference_nested(self):
         value = kergoth.PythonValue("time.strftime('%Y%m%d',time.gmtime())", 
                                      self.d)

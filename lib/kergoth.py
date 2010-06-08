@@ -455,7 +455,7 @@ class PythonValue(Value):
                 attr_node = node.func.value
                 identifier = node.func.attr
                 while isinstance(attr_node, ast.Attribute):
-                    identifier += "." + attr_node.attr
+                    identifier = attr_node.attr + "." + identifier
                     attr_node = attr_node.value
                 if isinstance(attr_node, ast.Name):
                     identifier = attr_node.id + "." + identifier
