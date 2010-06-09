@@ -1,6 +1,7 @@
 BB_HASH_OUTPUT ?= "${TMPDIR}/signatures/${PF}.${SIGNATURE}"
 
-BB_HASH_BLACKLIST += "__* *DIR *_DIR_* PATH PWD BBPATH FILE PARALLEL_MAKE"
+BB_HASH_BLACKLIST += "__* ${@' '.join(('*_%s' % o) for o in d.getVar('OVERRIDES', True).split(':'))}"
+BB_HASH_BLACKLIST += "*DIR *_DIR_* PATH PWD BBPATH FILE PARALLEL_MAKE"
 BB_HASH_BLACKLSIT += "SIGNATURE"
 
 # These are blacklisted due to python exceptions
