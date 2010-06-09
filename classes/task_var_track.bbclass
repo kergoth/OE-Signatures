@@ -88,10 +88,8 @@ python do_display_shelf () {
                 signature = kergoth.Signature(d, keys=[var])
                 missing = shelf[var].difference(set(signature.data.keys()))
                 for m in set(missing):
-                    if d.getVarFlag(m, "export"):
-                        missing.remove(m)
-
-                    if d.getVarFlag(m, "func") and not d.getVarFlag(m, "python"):
+                    if d.getVarFlag(m, "export") or \
+                       (d.getVarFlag(m, "func") and not d.getVarFlag(m, "python")):
                         missing.remove(m)
 
                 if missing:
