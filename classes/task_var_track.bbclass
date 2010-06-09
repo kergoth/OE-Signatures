@@ -64,14 +64,12 @@ python track_task_varrefs () {
         try:
             monkey_patch_exec(e)
         except Exception, exc:
-            bb.note("exception: %s" % exc)
-            bb.note(format_exc(exc))
+            bb.fatal(format_exc(exc))
     elif isinstance(e, (bb.build.TaskSucceeded, bb.build.TaskFailed)):
         try:
             un_monkey_patch_exec(e)
         except Exception, exc:
-            bb.note("exception: %s" % exc)
-            bb.note(format_exc(exc))
+            bb.fatal(format_exc(exc))
 }
 do_track_task_varrefs[lockfiles] = "${TOPDIR}/varrefs.lock"
 addhandler track_task_varrefs
