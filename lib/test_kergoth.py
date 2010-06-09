@@ -448,6 +448,24 @@ class TestSignatureGeneration(unittest.TestCase):
         self.assertEquals(signature.md5.digest(), 
                           'h HM\xea1\x90\xdeB[iV\xc7\xd9@3')
 
+    def test_reference_to_reference(self):
+        self.d.setVar("FOO", "-${BAR}-")
+        self.d.setVar("BAR", "+${BAZ}+")
+        self.d.setVar("BAZ", "alpha")
+        signature = kergoth.Signature(self.d, keys=["FOO"])
+        self.assertEquals(set(signature.data.keys()), set(["FOO", "BAR", "BAZ"]))
+
+    def test_reference_to_reference_shell(self):
+        self.d.setVar("alpha", "echo; beta")
+        self.d.setVarFlag("alpha", "func", True)
+        self.d.setVar("beta", "theta; echo")
+        self.d.setVarFlag("beta", "func", True)
+        self.d.setVar("theta", "echo foo")
+        self.d.setVarFlag("theta", "func", True)
+        signature = kergoth.Signature(self.d, keys=["alpha"])
+        self.assertEquals(set(signature.data.keys()), set(["alpha", "beta", "theta"]))
+
+
 class TestOEData(unittest.TestCase):
     import pickle
 
