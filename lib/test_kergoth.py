@@ -14,7 +14,7 @@ sys.path[0:0] = searchpath
 import bb.data
 import kergoth
 
-class TestExpansions(unittest.TestCase):
+class TestSimpleExpansions(unittest.TestCase):
     def setUp(self):
         self.d = bb.data.init()
         self.d["foo"] = "value of foo"
@@ -112,6 +112,52 @@ class TestExpansions(unittest.TestCase):
             self.assertTrue(kergoth.new_value("BAR", self.d) in exc.path)
         else:
             self.fail("RecursionError not raised")
+
+
+class TestNestedExpansions(unittest.TestCase):
+    def setUp(self):
+        self.d = bb.data.init()
+        self.d["foo"] = "foo"
+        self.d["bar"] = "bar"
+        self.d["value of foobar"] = "187"
+
+    def test_refs(self):
+        val = kergoth.Value("${value of ${foo}${bar}}", self.d)
+        self.assertEqual(str(val), "187")
+        self.assertEqual(val.references, set(["foo", "bar"]))
+
+    def test_python_refs(self):
+        val = kergoth.Value("${@${@3}**2 + ${@4}**2}", self.d)
+        self.assertEqual(str(val), "25")
+        self.assertEqual(val.references, set())
+
+    def test_ref_in_python_ref(self):
+        val = kergoth.Value("${@'${foo}' + 'bar'}", self.d)
+        self.assertEqual(str(val), "foobar")
+        self.assertEqual(val.references, set(["foo"]))
+
+    def test_python_ref_in_ref(self):
+        val = kergoth.Value("${${@'f'+'o'+'o'}}", self.d)
+        self.assertEqual(str(val), "foo")
+        self.assertEqual(val.references, set())
+
+    def test_deep_nesting(self):
+        depth = 200
+        val = kergoth.Value("${" * depth + "foo" + "}" * depth, self.d)
+        self.assertEqual(str(val), "foo")
+        self.assertEqual(val.references, set(["foo"]))
+
+    def test_deep_python_nesting(self):
+        depth = 50
+        val = kergoth.Value("${@" * depth + "1" + "+1}" * depth, self.d)
+        self.assertEqual(str(val), str(depth + 1))
+        self.assertEqual(val.references, set())
+
+    def test_mixed(self):
+        val = kergoth.Value("${value of ${@('${foo}'+'bar')[0:3]}${${@'BAR'.lower()}}}", self.d)
+        self.assertEqual(str(val), "187")
+        self.assertEqual(val.references, set(['foo']))
+
 
 class TestMemoize(unittest.TestCase):
     def test_memoized(self):
@@ -236,12 +282,12 @@ class TestContentsTracking(unittest.TestCase):
 
     pydata = """
         bb.data.getVar('somevar', d, True)
-        def test():
+        def test(d):
             foo = 'bar %s' % 'foo'
-            def test2():
+            def test2(d):
                 d.getVar(foo, True)
             d.getVar('bar', False)
-            test2()
+            test2(d)
 
         def a():
             \"\"\"some
@@ -249,10 +295,12 @@ class TestContentsTracking(unittest.TestCase):
             \"\"\"
             return "heh"
 
+        test(d)
+
         bb.data.expand(bb.data.getVar("something", False, d), d)
         bb.data.expand("${inexpand} somethingelse", d)
         bb.data.getVar(a(), d, False)
-    """
+"""
 
     def test_python(self):
         self.d.setVar("FOO", self.pydata)
@@ -260,7 +308,7 @@ class TestContentsTracking(unittest.TestCase):
 
         value = kergoth.new_value("FOO", self.d)
         self.assertEquals(value.references, set(["somevar", "bar", "something", "inexpand"]))
-        self.assertEquals(value.calls, set(["test2", "a"]))
+        self.assertEquals(value.calls, set(["test", "test2", "a"]))
 
     shelldata = """
         foo () {
@@ -341,10 +389,26 @@ class TestPython(unittest.TestCase):
         self.assertEqual(value.references, set(["foo"]))
         self.assertEqual(value.calls, set())
 
+    def test_getvar_computed_reference(self):
+        value = kergoth.PythonSnippet(
+            "bb.data.getVar('f' + 'o' + 'o', d, True)", self.d)
+        value.resolve()
+        self.assertEqual(value.references, set())
+        self.assertEqual(value.calls, set())
+
+    def test_getvar_exec_reference(self):
+        value = kergoth.PythonSnippet(
+            "eval('bb.data.getVar(\"foo\", d, True)')", self.d)
+        value.resolve()
+        self.assertEqual(value.references, set())
+        self.assertEqual(value.calls, set(["eval"]))
+
     def test_var_reference(self):
+        self.context["foo"] = lambda x: x
         value = kergoth.PythonValue("foo('${FOO}')", self.d)
         self.assertEqual(value.references, set(["FOO"]))
         self.assertEqual(value.calls, set(["foo"]))
+        del self.context["foo"]
 
     def test_var_exec(self):
         for etype in ("func", "task"):
@@ -424,9 +488,10 @@ class TestSignatureGeneration(unittest.TestCase):
         self.d.setVar("testvar", "${@x()}")
         bb.utils.simple_exec("globals()['x'] = lambda: 'alpha'", locals)
         signature = kergoth.Signature(self.d, keys=["testvar"])
-        print(signature.data_string)
+        self.assertTrue(signature.data)
         bb.utils.simple_exec("globals()['x'] = lambda: 'beta'", locals)
         signature2 = kergoth.Signature(self.d, keys=["testvar"])
+        self.assertTrue(signature2.data)
         self.assertNotEqual(signature.data, signature2.data)
 
     def test_signature_oe_devshell(self):
