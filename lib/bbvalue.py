@@ -1,711 +1,240 @@
-#!/usr/bin/env python2.6
-"""BitBake variable reference tracking and signature generation"""
-
 import re
-import codegen
-import ast
-import hashlib
-from fnmatch import fnmatchcase
-from itertools import chain
 from collections import deque
-from pysh import pyshyacc, pyshlex
+import bb.data
 from bb import msg, utils
 
-if not msg.domain.Default in msg.debug_level and \
-   not "default" in msg.debug_level:
-    msg.set_debug_level(0)
-
-from pysh.sherrors import ShellSyntaxError
-
 class RecursionError(RuntimeError):
-    def __init__(self, variable, path = None):
+    def __init__(self, variable):
         self.variable = variable
-        self.path = path
 
     def __str__(self):
-        string = "Recursive variable reference for %s" % self.variable
-        if self.path:
-            string += " via %s" % self.path
-        return string
+        return "Recursive variable reference for '%s'" % self.variable
 
 class PythonExpansionError(Exception):
-    def __init__(self, exception, node, path):
+    def __init__(self, exception, node):
         self.exception = exception
         self.node = node
-        self.path = path
 
     def __str__(self):
-        string = "'%s' while resolving %s" % (self.exception, stable_repr(self.node))
-        if self.path:
-            string += " via %s" % self.path
-        return string
+        return "'%s' while resolving '%s'" % (self.exception, str(self.node))
 
 
-class Path(list):
-    def __str__(self):
-        return " -> ".join(stable_repr(v) for v in self)
+# The following Visitor infrastructure was heavily inspired by the one
+# implemented in the Python standard library module 'ast'.
 
+def iter_fields(node):
+    """
+    Yield a tuple of ``(fieldname, value)`` for each field in ``node._fields``
+    that is present on *node*.
+    """
+    for field in dir(node):
+        if field.startswith('field_'):
+            try:
+                yield field, getattr(node, field)
+            except AttributeError:
+                pass
 
-class Components(list):
-    """A list of components, which concatenates itself upon str(), and runs
-    str() on each component.  A given component is defined as being a
-    string, python snippet, or variable reference"""
+class Vistor(object):
+    def visit(self, node):
+        """Visit a node."""
+        method = 'visit_' + node.__class__.__name__
+        visitor = getattr(self, method, self.generic_visit)
+        return visitor(node)
 
-    def __str__(self):
-        return self.resolve()
-
-    def _resolve(self, path = None):
-        for v in self:
-            if hasattr(v, "resolve"):
-                yield v.resolve(path)
-            else:
-                yield v
-
-    def resolve(self, path = None):
-        if path is None:
-            path = Path()
-        return "".join(self._resolve(path))
-
-    def __hash__(self):
-        return hash("Components(%s)" % ", ".join(repr(c) for c in self))
-
-
-class VariableRef(object):
-    """Reference to a variable.  The variable name is supplied as a Components
-    object, as we allow nested variable references, so the inside of a
-    reference can be any number of components"""
-
-    def __init__(self, components, metadata):
-        self.components = components
-        self.metadata = metadata
-
-    def __repr__(self):
-        return "VariableRef(%s, %s)" % (repr(self.components),
-                                        repr(self.metadata))
-
-    def __str__(self):
-        return self.resolve()
-
-    def resolve(self, path = None):
-        if path is None:
-            path = Path()
-
-        name = self.components.resolve(path)
-        value = new_value(name, self.metadata)
-        if value in path:
-            raise RecursionError(name, path)
-
-        if hasattr(value, "resolve"):
-            return value.resolve(path)
-        else:
-            return value
-
+    def generic_visit(self, node):
+        """Called if no explicit visitor function exists for a node."""
+        for field, value in iter_fields(node):
+            if isinstance(value, list):
+                for item in value:
+                    if isinstance(item, Value):
+                        self.visit(item)
+            elif isinstance(value, Value):
+                self.visit(value)
 
 class Value(object):
-    """Parse a value from the OE metadata into a Components object, held
-    internally.  Running str() on this is equivalent to doing the same to its
-    internal Components."""
-
-    variable_ref = re.compile(r"(\$\{|\})")
-    memory = {}
-
-    def __new__(cls, value, metadata):
-        key = (cls, value, id(metadata))
-        if key in cls.memory:
-            return cls.memory[key]
-        else:
-            cls.memory[key] = value = object.__new__(cls)
-            return value
-
-    def __init__(self, value, metadata):
-        if not isinstance(value, basestring):
-            self.components = Components(value)
-            self.value = None
-        else:
-            self.value = value
-            self.components = Components()
+    def __init__(self, metadata):
         self.metadata = metadata
-        self.references = set()
-        self.parse()
-        self.update_references(self)
-
-    def update_references(self, value):
-        for item in value.components:
-            if isinstance(item, VariableRef):
-                if all(isinstance(x, basestring) for x in item.components):
-                    self.references.add("".join(item.components))
-                else:
-                    self.update_references(item)
-            elif isinstance(item, Value):
-                self.references.update(item.references)
 
     def __eq__(self, other):
         return isinstance(other, type(self)) and \
-               self.components == other.components and \
                self.metadata == other.metadata
 
     def __ne__(self, other):
         return not self == other
 
     def __hash__(self):
-        return hash((self.components, id(self.metadata)))
-
-    def __repr__(self):
-        return "%s(%s, %s)" % (self.__class__.__name__, repr(self.components),
-                               repr(self.metadata))
+        return hash(id(self.metadata))
 
     def __str__(self):
         return self.resolve()
 
-    def resolve(self, path = None):
-        if path is None:
-            path = Path()
-        path.append(self)
-        resolved = self.components.resolve(path)
-        path.pop()
-        return resolved
+class Literal(Value):
+    def __init__(self, metadata, value):
+        Value.__init__(self, metadata)
+        self.value = value
 
-    def parse(self):
-        """Parse a value from the OE metadata into a Components object"""
+    def __eq__(self, other):
+        return Value.__eq__(self, other) and self.value == other.value
 
-        if self.value is None:
-            return
+    def __hash__(self):
+        return hash((self.value, id(self.metadata)))
+  
+    def __repr__(self):
+        return "Literal(%s, %s)" % (repr(self.metadata), self.value)
 
-        if not isinstance(self.value, basestring) or \
-           "${" not in self.value:
-            self.components.append(self.value)
-            return
+    def resolve(self):
+        return self.value
 
-        tokens = (var for var in self.variable_ref.split(self.value) if var)
-        result = Components()
-        current = None
-        stack = deque()
-        for token in tokens:
-            if token == "${":
-                stack.append(current)
-                current = Components()
-            elif current is not None:
-                if token == "}":
-                    if hasattr(current[0], "startswith") and \
-                       current[0].startswith("@"):
-                        current[0] = current[0][1:]
-                        value = PythonSnippet(current, self.metadata)
-                    else:
-                        value = VariableRef(current, self.metadata)
+class Compound(Value):
+    def __init__(self, metadata, components=[]):
+        Value.__init__(self, metadata)
+        self.field_components = components[:]
 
-                    current = stack.pop()
-                    if current is None:
-                        result.append(value)
-                    else:
-                        current.append(value)
-                else:
-                    current.append(token)
-            else:
-                result.append(token)
-        if current:
-            result += current
-        self.components = result
+    def __eq__(self, other):
+        return Value.__eq__(self, other) and \
+               self.field_components == other.field_components
 
+    def __hash__(self):
+        return hash((repr(self), id(self.metadata)))
+  
+    def __repr__(self):
+        return "%s(%s, %s)" % (self.__class__.__name__,
+                               repr(self.metadata),
+                               repr(self.field_components))
 
-class ShellValue(Value):
-    """Represents a block of shell code, initialized from a string.  First
-    parses the string into a components object to gather information about
-    regular variable references, then parses the resulting expanded shell code
-    to extract calls to other shell functions in the metadata.
+    def append(self, value):
+        def can_coalesce(a, b):
+            return isinstance(a, Literal) and isinstance(b, Literal)
 
-    May raise: NotImplementedError, ShellSyntaxError
-    """
+        comps = self.field_components
+        if len(comps) > 0 and can_coalesce(comps[-1], value):
+            comps[-1].value += value.value
+        else:
+            comps.append(value)
 
-    def __init__(self, value, metadata):
-        self.funcdefs = set()
-        self.execs = set()
-        self.execs = set()
-        Value.__init__(self, value, metadata)
+    def extend(self, values):
+        for value in values:
+            self.append(value)
 
-    def parse(self):
-        Value.parse(self)
-        try:
-            strvalue = str(self.components)
-        except (RecursionError, PythonExpansionError):
-            strvalue = self.value
+    def resolve(self):
+        return "".join(c.resolve() for c in self.field_components)
 
-        self.execs = self.parse_shell(strvalue)
-        for var in self.metadata.keys():
-            flags = self.metadata.getVarFlags(var)
-            if flags:
-                if "export" in flags:
-                    self.references.add(var)
-                elif var in self.execs and \
-                     "func" in flags and "python" not in flags:
-                    self.references.add(var)
+class PythonValue(Compound):
+    def __init__(self, metadata, components=[]):
+        Compound.__init__(self, metadata, components)
 
-    def parse_shell(self, value):
-        """Parse the supplied shell code in a string, returning the external
-        commands it executes.
-        """
-
-        try:
-            tokens, _ = pyshyacc.parse(value, eof=True, debug=False)
-        except pyshlex.NeedMore:
-            raise ShellSyntaxError("Unexpected EOF")
-
-        for token in tokens:
-            self.process_tokens(token)
-        cmds = set(cmd for cmd in self.execs
-                       if cmd not in self.funcdefs)
-        return cmds
-
-    def process_tokens(self, tokens):
-        """Process a supplied portion of the syntax tree as returned by
-        pyshyacc.parse.
-        """
-
-        def function_definition(value):
-            self.funcdefs.add(value.name)
-            return [value.body], None
-
-        def case_clause(value):
-            # Element 0 of each item in the case is the list of patterns, and
-            # Element 1 of each item in the case is the list of commands to be
-            # executed when that pattern matches.
-            words = chain(*[item[0] for item in value.items])
-            cmds  = chain(*[item[1] for item in value.items])
-            return cmds, words
-
-        def if_clause(value):
-            main = chain(value.cond, value.if_cmds)
-            rest = value.else_cmds
-            if isinstance(rest, tuple) and rest[0] == "elif":
-                return chain(main, if_clause(rest[1]))
-            else:
-                return chain(main, rest)
-
-        def simple_command(value):
-            return None, chain(value.words, (assign[1] for assign in value.assigns))
-
-        token_handlers = {
-            "and_or": lambda x: ((x.left, x.right), None),
-            "async": lambda x: ([x], None),
-            "brace_group": lambda x: (x.cmds, None),
-            "for_clause": lambda x: (x.cmds, x.items),
-            "function_definition": function_definition,
-            "if_clause": lambda x: (if_clause(x), None),
-            "pipeline": lambda x: (x.commands, None),
-            "redirect_list": lambda x: ([x.cmd], None),
-            "subshell": lambda x: (x.cmds, None),
-            "while_clause": lambda x: (chain(x.condition, x.cmds), None),
-            "until_clause": lambda x: (chain(x.condition, x.cmds), None),
-            "simple_command": simple_command,
-            "case_clause": case_clause,
-        }
-
-        for token in tokens:
-            name, value = token
-            try:
-                more_tokens, words = token_handlers[name](value)
-            except KeyError:
-                raise NotImplementedError("Unsupported token type " + name)
-
-            if more_tokens:
-                self.process_tokens(more_tokens)
-
-            if words:
-                self.process_words(words)
-
-    def process_words(self, words):
-        """Process a set of 'words' in pyshyacc parlance, which includes
-        extraction of executed commands from $() blocks, as well as grabbing
-        the command name argument.
-        """
-
-        words = list(words)
-        for word in list(words):
-            wtree = pyshlex.make_wordtree(word[1])
-            for part in wtree:
-                if not isinstance(part, list):
-                    continue
-
-                if part[0] in ('`', '$('):
-                    command = pyshlex.wordtree_as_string(part[1:-1])
-                    self.parse_shell(command)
-
-                    if word[0] in ("cmd_name", "cmd_word"):
-                        if word in words:
-                            words.remove(word)
-
-        usetoken = False
-        for word in words:
-            if word[0] in ("cmd_name", "cmd_word") or \
-               (usetoken and word[0] == "TOKEN"):
-                if "=" in word[1]:
-                    usetoken = True
-                    continue
-
-                cmd = word[1]
-                if cmd.startswith("$"):
-                    msg.debug(1, None, "Warning: execution of non-literal command '%s'" % cmd)
-                elif cmd == "eval":
-                    command = " ".join(word for _, word in words[1:])
-                    self.parse_shell(command)
-                else:
-                    self.execs.add(cmd)
-                break
-
-
-class PythonValue(Value):
-    """Represents a block of python code, initialized from a string.  First
-    determines the variables referenced via normal variable expansion, then
-    traverses the python syntax tree to extract variables references accessed
-    via the usual bitbake metadata APIs, as well as the external functions
-    called (to track usage of functions in the methodpool).
-    """
-
-    class ValueVisitor(ast.NodeVisitor):
-        """Visitor to traverse a python abstract syntax tree and obtain
-        the variables referenced via bitbake metadata APIs, and the external
-        functions called.
-        """
-
-        getvars = ("d.getVar", "bb.data.getVar", "data.getVar")
-        expands = ("d.expand", "bb.data.expand", "data.expand")
-        execs = ("bb.build.exec_func", "bb.build.exec_task")
-
-        @classmethod
-        def _compare_name(cls, strparts, node):
-            """Given a sequence of strings representing a python name,
-            where the last component is the actual Name and the prior
-            elements are Attribute nodes, determine if the supplied node
-            matches.
-            """
-
-            if not strparts:
-                return True
-
-            current, rest = strparts[0], strparts[1:]
-            if isinstance(node, ast.Attribute):
-                if current == node.attr:
-                    return cls._compare_name(rest, node.value)
-            elif isinstance(node, ast.Name):
-                if current == node.id:
-                    return True
-            return False
-
-        @classmethod
-        def compare_name(cls, value, node):
-            """Convenience function for the _compare_node method, which
-            can accept a string (which is split by '.' for you), or an
-            iterable of strings, in which case it checks to see if any of
-            them match, similar to isinstance.
-            """
-
-            if isinstance(value, basestring):
-                return cls._compare_name(tuple(reversed(value.split("."))),
-                                         node)
-            else:
-                return any(cls.compare_name(item, node) for item in value)
-
-        def __init__(self, value):
-            self.var_references = set()
-            self.var_execs = set()
-            self.direct_func_calls = set()
-            self.value = value
-            ast.NodeVisitor.__init__(self)
-
-        @classmethod
-        def warn(cls, func, arg):
-            """Warn about calls of bitbake APIs which pass a non-literal
-            argument for the variable name, as we're not able to track such
-            a reference.
-            """
-
-            try:
-                funcstr = codegen.to_source(func)
-                argstr = codegen.to_source(arg)
-            except TypeError:
-                msg.debug(2, None, "Failed to convert function and argument to source form")
-            else:
-                msg.debug(1, None, "Warning: in call to '%s', argument '%s' is not a literal" %
-                                     (funcstr, argstr))
-
-        def visit_Call(self, node):
-            ast.NodeVisitor.generic_visit(self, node)
-            if self.compare_name(self.getvars, node.func):
-                if isinstance(node.args[0], ast.Str):
-                    self.var_references.add(node.args[0].s)
-                else:
-                    self.warn(node.func, node.args[0])
-            elif self.compare_name(self.expands, node.func):
-                if isinstance(node.args[0], ast.Str):
-                    value = Value(node.args[0].s, self.value.metadata)
-                    self.var_references.update(value.references)
-                elif isinstance(node.args[0], ast.Call) and \
-                     self.compare_name(self.getvars, node.args[0].func):
-                    pass
-                else:
-                    self.warn(node.func, node.args[0])
-            elif self.compare_name(self.execs, node.func):
-                if isinstance(node.args[0], ast.Str):
-                    self.var_execs.add(node.args[0].s)
-                else:
-                    self.warn(node.func, node.args[0])
-            elif isinstance(node.func, ast.Name):
-                self.direct_func_calls.add(node.func.id)
-            elif isinstance(node.func, ast.Attribute):
-                # We must have a qualified name.  Therefore we need
-                # to walk the chain of 'Attribute' nodes to determine
-                # the qualification.
-                attr_node = node.func.value
-                identifier = node.func.attr
-                while isinstance(attr_node, ast.Attribute):
-                    identifier = attr_node.attr + "." + identifier
-                    attr_node = attr_node.value
-                if isinstance(attr_node, ast.Name):
-                    identifier = attr_node.id + "." + identifier
-                self.direct_func_calls.add(identifier)
-
-    def __init__(self, value, metadata):
-        self.visitor = self.ValueVisitor(self)
-        self.function_references = set()
-        self.calls = None
-
-        Value.__init__(self, value, metadata)
-
-    def parse(self):
-        Value.parse(self)
-        value = str(self.components)
-        code = compile(value, "<string>", "exec", ast.PyCF_ONLY_AST)
-        self.visitor.visit(code)
-
-        self.references.update(self.visitor.var_references)
-        self.references.update(self.visitor.var_execs)
-        self.calls = self.visitor.direct_func_calls
-        env = {}
-        for var in self.calls:
-            try:
-                func_obj = utils.better_eval(var, env)
-                self.function_references.add((var, func_obj))
-            except (NameError, AttributeError):
-                pass
-
-class PythonSnippet(PythonValue):
-    """Lazy evaluation of a python snippet"""
-
-    def resolve(self, path = None):
-        code = PythonValue.resolve(self, path)
-        codeobj = compile(code.strip(), "<expansion>", "eval")
+    def resolve(self):
+        codestr = super(PythonValue, self).resolve()
+        codeobj = compile(codestr.strip(), "<expansion>", "eval")
         try:
             value = str(utils.better_eval(codeobj, {"d": self.metadata}))
         except Exception, exc:
-            raise PythonExpansionError(exc, self, path)
-        return Value(value, self.metadata).resolve(path)
+            raise PythonExpansionError(exc, self)
+        return parse(value, self.metadata).resolve()
 
+class VariableRef(Compound):
+    def __init__(self, metadata, components=[]):
+        Compound.__init__(self, metadata, components)
+        self.locked = False
 
-from tokenize import generate_tokens, untokenize, INDENT, DEDENT
-try:
-    from cStringIO import StringIO
-except ImportError:
-    from StringIO import StringIO
+    def referred(self):
+        return super(VariableRef, self).resolve()
 
-def dedent_python(codestr):
-    """Remove the first level of indentation from a block of python code"""
+    def resolve(self):
+        refname = self.referred()
+        if self.locked:
+            raise RecursionError(refname)
+ 
+        newvalue = bbvalue(refname, self.metadata)
 
-    indent = None
-    level = 0
-    tokens = []
-    for toknum, tokval, _, _, _ in generate_tokens(StringIO(codestr).readline):
-        if toknum == INDENT:
-            level += 1
-            if level == 1:
-                indent = tokval
-                continue
-            elif indent:
-                tokval = tokval[len(indent):]
-        elif toknum == DEDENT:
-            level -= 1
-            if level == 0:
-                indent = None
-                continue
-        tokens.append((toknum, tokval))
-    return untokenize(tokens)
-
-_value_cache = {}
-def new_value(variable, metadata):
-    """Value creation factory for a variable in the metadata"""
-
-    strvalue = metadata.getVar(variable, False)
-    if strvalue is None:
-        return "${%s}" % variable
-
-    if metadata.getVarFlag(variable, "func"):
-        if metadata.getVarFlag(variable, "python"):
-            value = PythonValue(dedent_python(strvalue.expandtabs()), metadata)
+        self.locked = True
+        if newvalue:
+            retvalue = newvalue.resolve()
         else:
-            try:
-                value = ShellValue(strvalue, metadata)
-            except pyshlex.NeedMore:
-                raise RuntimeError("Ran out of input while parsing shell for %s" % variable)
-            except ShellSyntaxError, exc:
-                raise RuntimeError("Syntax error parsing shell for %s: %s" % (variable, exc))
-    else:
-        value = Value(strvalue, metadata)
+            retvalue = "${%s}" % refname
+        self.locked = False
 
-    dirs = metadata.getVarFlag(variable, "dirs")
-    if dirs:
-        value.references.update(Value(dirs, metadata).references)
+        return retvalue
 
-    varrefs = metadata.getVarFlag(variable, "varrefs")
-    if varrefs:
-        refs = Value(varrefs, metadata)
-        value.references.update(refs.references)
-        patterns = str(refs).split()
-        for key in metadata.keys():
-            if any(fnmatchcase(key, pat) for pat in patterns):
-                value.references.add(key)
+class ShellSnippet(Compound):
+    def __init__(self, metadata, components=[]):
+        Compound.__init__(self, metadata, components)
+
+class PythonSnippet(Compound):
+    def __init__(self, metadata, components=[]):
+        Compound.__init__(self, metadata, components)
+
+def bbvalue(varname, metadata):
+    strvalue = metadata.getVar(varname, False)
+    if strvalue is None:
+        return None
+
+    sigtup = (varname, strvalue, metadata)
+
+    if sigtup in bbvalue.memory:
+        return bbvalue.memory[sigtup]
+ 
+    value = parse(strvalue, metadata)
+    if metadata.getVarFlag(varname, "func"):
+        if metadata.getVarFlag(varname, "python"):
+            value = PythonSnippet(metadata, [value])
+        else:
+            value = ShellSnippet(metadata, [value])
+
+    bbvalue.memory[sigtup] = value
 
     return value
 
-def stable_repr(value):
-    """Produce a more stable 'repr' string for a value"""
-    if isinstance(value, dict):
-        return "{%s}" % ", ".join("%s: %s" % (stable_repr(key), stable_repr(value))
-                                  for key, value in sorted(value.iteritems()))
-    elif isinstance(value, (set, frozenset)):
-        return "%s(%s)" % (value.__class__.__name__, stable_repr(sorted(value)))
-    elif isinstance(value, list):
-        return "[%s]" % ", ".join(stable_repr(value) for value in value)
-    elif isinstance(value, tuple):
-        return "(%s)" % ", ".join(stable_repr(value) for value in value)
-    elif isinstance(value, (VariableRef, Value)):
-        return "%s(%s)" % (value.__class__.__name__, stable_repr(value.components))
-    return repr(value)
+def shvalue(varname, metadata):
+    return ShellSnippet(metadata, [parse(varname, metadata)])
 
-class Signature(object):
-    """A signature is produced uniquely identifying part of the BitBake metadata.
+def pyvalue(varname, metadata):
+    return PythonSnippet(metadata, [parse(varname, metadata)])
 
-    keys is the list of variable names to include in the signature (default is
-    all current tasks).  blacklist is a list of globs which identify variables
-    which should not be included at all, even when referenced by other
-    variables.
-    """
+bbvalue.memory = {}
 
-    def __init__(self, metadata, keys = None, blacklist = None):
-        self._md5 = None
-        self._data = None
-        self._data_string = None
-        self.metadata = metadata
+def parse(str, metadata):
+    """Parses a metadata string into a value Abstract Syntax Tree (AST) which
+       represents the structure of that string."""
 
-        if keys:
-            self.keys = keys
-        else:
-            self.keys = [key for key in self.metadata.keys()
-                         if metadata.getVarFlag(key, "task")]
+    class Tokenizer(object):
+        variable_ref = re.compile(r"(\$\{@|\$\{|\})")
+   
+        def __init__(self, str):
+            self.tokens = [var for var in Tokenizer.variable_ref.split(str)                                    if var]
+            self.i = 0
 
-        if blacklist:
-            self.blacklist = blacklist
-        else:
-            blacklist = metadata.getVar("BB_HASH_BLACKLIST", True)
-            if blacklist:
-                self.blacklist = blacklist.split()
+        def next(self):
+            self.i += 1
+            return self
+
+        @property
+        def current(self):
+            if self.i < len(self.tokens):
+                return self.tokens[self.i]
             else:
-                self.blacklist = None
+                return None
 
-    def __repr__(self):
-        return "Signature(%s, %s, %s)" % (self.metadata, self.keys, self.blacklist)
-
-    def __hash__(self):
-        return hash((id(self.metadata), self.keys, self.blacklist))
-
-    def __str__(self):
-        from base64 import urlsafe_b64encode
-
-        return urlsafe_b64encode(self.md5.digest()).rstrip("=")
-
-    def hash(self):
-        """Return an integer version of the signature"""
-        return int(self.md5.hexdigest(), 16)
-
-    @property
-    def md5(self):
-        """The underlying python 'md5' object"""
-
-        value = self._md5
-        if value is None:
-            value = self._md5 = hashlib.md5(self.data_string)
-        return value
-
-    @property
-    def data_string(self):
-        """Stabilized string representation of the data to be hashed"""
-        string = self._data_string
-        if string is None:
-            string = self._data_string = stable_repr(self.data)
-        return string
-
-    @property
-    def data(self):
-        """The object containing the data which will be converted to a string and then hashed"""
-
-        if self._data:
-            return self._data
-
-        seen = set()
-        def data_for_hash(key):
-            """Returns an iterator over the variable names and their values, including references"""
-
-            if key in seen:
-                return
-            seen.add(key)
-            if self.is_blacklisted(key):
-                return
-
-            valstr = self.metadata.getVar(key, False)
-            if valstr is not None:
-                try:
-                    value = self.transform_blacklisted(new_value(key, self.metadata))
-                except (SyntaxError, ShellSyntaxError, NotImplementedError,
-                        PythonExpansionError, RecursionError), exc:
-                    msg.error(None, "Unable to parse %s, excluding from signature: %s" %
-                                 (key, exc))
+    def _parse(toker, parent):
+        clsmap = { '${': VariableRef, '${@': PythonValue }
+        while toker.current:
+            token = toker.current
+            if token in clsmap:
+                # Attempt to specutively parse the reference.  If the 
+                # reference never closes, then revert to a literal.
+                value = _parse(toker.next(), clsmap[token](metadata))
+                if toker.current == "}":
+                    parent.append(value)
                 else:
-                    yield key, value
+                    parent.extend(
+                        [Literal(metadata, token)] + value.field_components)
+            elif toker.current == "}" and \
+                 isinstance(parent, (VariableRef, PythonValue)):
+                return parent
+            else:
+                parent.append(Literal(metadata, toker.current))
+            toker.next()
+        return parent
 
-                    for ref in value.references:
-                        for other in data_for_hash(ref):
-                            yield other
+    return _parse(Tokenizer(str), Compound(metadata))
 
-        data = self._data = dict(chain(*[data_for_hash(key) for key in self.keys]))
-        return data
-
-    def is_blacklisted(self, item):
-        """Determine if the supplied item is blacklisted"""
-
-        if not self.blacklist:
-            return
-
-        if isinstance(item, basestring):
-            valstr = item
-        elif all(isinstance(c, basestring) for c in item.components):
-            valstr = str(item.components)
-        else:
-            return
-
-        for bl in self.blacklist:
-            if fnmatchcase(valstr, bl):
-                return "${%s}" % valstr
-
-    def transform_blacklisted(self, item):
-        """Transform the supplied item tree, changing all blacklisted objects
-        into their unexpanded forms.
-        """
-
-        if isinstance(item, PythonSnippet):
-            return str(item)
-        elif isinstance(item, Value):
-            transformed = Components(self.transform_blacklisted(i) for i in item.components)
-            if transformed != item.components:
-                return item.__class__(transformed, self.metadata)
-        elif isinstance(item, VariableRef):
-            black = self.is_blacklisted(item)
-            if black:
-                return black
-        return item
