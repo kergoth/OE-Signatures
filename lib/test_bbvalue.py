@@ -22,27 +22,27 @@ class TestSimpleExpansions(unittest.TestCase):
         self.d["value of foo"] = "value of 'value of foo'"
 
     def test_one_var(self):
-        val = bbvalue.parse("${foo}", self.d)
+        val = bbvalue.bbparse("${foo}", self.d)
         self.assertEqual(str(val), "value of foo")
 
     def test_indirect_one_var(self):
-        val = bbvalue.parse("${${foo}}", self.d)
+        val = bbvalue.bbparse("${${foo}}", self.d)
         self.assertEqual(str(val), "value of 'value of foo'")
 
     def test_indirect_and_another(self):
-        val = bbvalue.parse("${${foo}} ${bar}", self.d)
+        val = bbvalue.bbparse("${${foo}} ${bar}", self.d)
         self.assertEqual(str(val), "value of 'value of foo' value of bar")
 
     def test_python_snippet(self):
-        val = bbvalue.parse("${@5*12}", self.d)
+        val = bbvalue.bbparse("${@5*12}", self.d)
         self.assertEqual(str(val), "60")
 
     def test_expand_in_python_snippet(self):
-        val = bbvalue.parse("${@'boo ' + '${foo}'}", self.d)
+        val = bbvalue.bbparse("${@'boo ' + '${foo}'}", self.d)
         self.assertEqual(str(val), "boo value of foo")
 
     def test_python_snippet_getvar(self):
-        val = bbvalue.parse("${@d.getVar('foo', True) + ' ${bar}'}", self.d)
+        val = bbvalue.bbparse("${@d.getVar('foo', True) + ' ${bar}'}", self.d)
         self.assertEqual(str(val), "value of foo value of bar")
 
     def test_python_snippet_syntax_error(self):
@@ -62,11 +62,11 @@ class TestSimpleExpansions(unittest.TestCase):
         self.assertRaises(bbvalue.PythonExpansionError, val.resolve)
 
     def test_value_containing_value(self):
-        val = bbvalue.parse("${@d.getVar('foo', True) + ' ${bar}'}", self.d)
+        val = bbvalue.bbparse("${@d.getVar('foo', True) + ' ${bar}'}", self.d)
         self.assertEqual(str(val), "value of foo value of bar")
 
     def test_reference_undefined_var(self):
-        val = bbvalue.parse("${undefinedvar} meh", self.d)
+        val = bbvalue.bbparse("${undefinedvar} meh", self.d)
         self.assertEqual(str(val), "${undefinedvar} meh")
 
     def test_double_reference(self):
@@ -94,7 +94,7 @@ class TestSimpleExpansions(unittest.TestCase):
         self.assertRaises(bbvalue.RecursionError, str, value)
 
     def test_incomplete_varexp_single_quotes(self):
-        val = bbvalue.shvalue("sed -i -e 's:IP{:I${:g' $pc", self.d)
+        val = bbvalue.shparse("sed -i -e 's:IP{:I${:g' $pc", self.d)
         self.assertEqual(str(val), "sed -i -e 's:IP{:I${:g' $pc")
 
 
@@ -106,37 +106,37 @@ class TestNestedExpansions(unittest.TestCase):
         self.d["value of foobar"] = "187"
 
     def test_refs(self):
-        val = bbvalue.parse("${value of ${foo}${bar}}", self.d)
+        val = bbvalue.bbparse("${value of ${foo}${bar}}", self.d)
         self.assertEqual(str(val), "187")
 
     def test_python_refs(self):
-        val = bbvalue.parse("${@${@3}**2 + ${@4}**2}", self.d)
+        val = bbvalue.bbparse("${@${@3}**2 + ${@4}**2}", self.d)
         self.assertEqual(str(val), "25")
 
     def test_ref_in_python_ref(self):
-        val = bbvalue.parse("${@'${foo}' + 'bar'}", self.d)
+        val = bbvalue.bbparse("${@'${foo}' + 'bar'}", self.d)
         self.assertEqual(str(val), "foobar")
 
     def test_python_ref_in_ref(self):
-        val = bbvalue.parse("${${@'f'+'o'+'o'}}", self.d)
+        val = bbvalue.bbparse("${${@'f'+'o'+'o'}}", self.d)
         self.assertEqual(str(val), "foo")
 
     def test_deep_nesting(self):
         depth = 100
-        val = bbvalue.parse("${" * depth + "foo" + "}" * depth, self.d)
+        val = bbvalue.bbparse("${" * depth + "foo" + "}" * depth, self.d)
         self.assertEqual(str(val), "foo")
 
     def test_deep_python_nesting(self):
         depth = 50
-        val = bbvalue.parse("${@" * depth + "1" + "+1}" * depth, self.d)
+        val = bbvalue.bbparse("${@" * depth + "1" + "+1}" * depth, self.d)
         self.assertEqual(str(val), str(depth + 1))
 
     def test_mixed(self):
-        val = bbvalue.parse("${value of ${@('${foo}'+'bar')[0:3]}${${@'BAR'.lower()}}}", self.d)
+        val = bbvalue.bbparse("${value of ${@('${foo}'+'bar')[0:3]}${${@'BAR'.lower()}}}", self.d)
         self.assertEqual(str(val), "187")
 
     def test_runtime(self):
-        val = bbvalue.parse("${${@'value of' + ' f'+'o'+'o'+'b'+'a'+'r'}}", 
+        val = bbvalue.bbparse("${${@'value of' + ' f'+'o'+'o'+'b'+'a'+'r'}}", 
                             self.d)
         self.assertEqual(str(val), "187")
 
@@ -158,7 +158,7 @@ class TestMemoize(unittest.TestCase):
     def test_changed_after_memoized(self):
         d = bb.data.init()
         d.setVar("foo", "value of foo")
-        val = bbvalue.parse("${foo}", d)
+        val = bbvalue.bbparse("${foo}", d)
         self.assertEqual(str(bbvalue.bbvalue("foo", d)), "value of foo")
         d.setVar("foo", "second value of foo")
         self.assertEqual(str(bbvalue.bbvalue("foo", d)), "second value of foo")

@@ -1,3 +1,7 @@
+"""This module defines a set of classes and free functions for building
+   BitBake values.  Values can either be created directly or parsed from
+   a string."""
+
 import re
 from collections import deque
 import bb.data
@@ -27,6 +31,7 @@ def iter_fields(node):
     Yield a tuple of ``(fieldname, value)`` for each field in ``node._fields``
     that is present on *node*.
     """
+
     for field in dir(node):
         if field.startswith('field_'):
             try:
@@ -37,12 +42,14 @@ def iter_fields(node):
 class Vistor(object):
     def visit(self, node):
         """Visit a node."""
+
         method = 'visit_' + node.__class__.__name__
         visitor = getattr(self, method, self.generic_visit)
         return visitor(node)
 
     def generic_visit(self, node):
         """Called if no explicit visitor function exists for a node."""
+
         for field, value in iter_fields(node):
             if isinstance(value, list):
                 for item in value:
@@ -52,6 +59,8 @@ class Vistor(object):
                 self.visit(value)
 
 class Value(object):
+    """A simple value that is meant as a base class for all other values."""
+
     def __init__(self, metadata):
         self.metadata = metadata
 
@@ -69,6 +78,9 @@ class Value(object):
         return self.resolve()
 
 class Literal(Value):
+    """A simple value that resolves to whatever string it was initialized 
+       with."""
+
     def __init__(self, metadata, value):
         Value.__init__(self, metadata)
         self.value = value
@@ -86,6 +98,10 @@ class Literal(Value):
         return self.value
 
 class Compound(Value):
+    """Compound values are composed of other compound values
+       and literals.  The value of a compound value resolves to the
+       concatenation of all its component values."""
+
     def __init__(self, metadata, components=[]):
         Value.__init__(self, metadata)
         self.field_components = components[:]
@@ -103,6 +119,8 @@ class Compound(Value):
                                repr(self.field_components))
 
     def append(self, value):
+        """Append a new value to the compound value."""
+
         def can_coalesce(a, b):
             return isinstance(a, Literal) and isinstance(b, Literal)
 
@@ -113,6 +131,8 @@ class Compound(Value):
             comps.append(value)
 
     def extend(self, values):
+        """Extend the compound value with a sequence of values."""
+
         for value in values:
             self.append(value)
 
@@ -120,6 +140,10 @@ class Compound(Value):
         return "".join(c.resolve() for c in self.field_components)
 
 class PythonValue(Compound):
+    """A compound value that represents a value to be evaluated in Python.
+       The resolution of a PythonValue takes the resolution of its
+       components and returns that resolution as evaluated by Python."""
+
     def __init__(self, metadata, components=[]):
         Compound.__init__(self, metadata, components)
 
@@ -130,14 +154,20 @@ class PythonValue(Compound):
             value = str(utils.better_eval(codeobj, {"d": self.metadata}))
         except Exception, exc:
             raise PythonExpansionError(exc, self)
-        return parse(value, self.metadata).resolve()
+        return bbparse(value, self.metadata).resolve()
 
 class VariableRef(Compound):
+    """A compound value which holds a reference to another value.  The 
+       resolution of a CompundValue dereferences the value referenced and 
+       returns the resolution of the dereferenced value."""
+
     def __init__(self, metadata, components=[]):
         Compound.__init__(self, metadata, components)
         self.locked = False
 
     def referred(self):
+        """Returns the name of the value being referred to."""
+
         return super(VariableRef, self).resolve()
 
     def resolve(self):
@@ -165,6 +195,9 @@ class PythonSnippet(Compound):
         Compound.__init__(self, metadata, components)
 
 def bbvalue(varname, metadata):
+    """Constructs a new value from a variable defined in the BitBake
+       metadata."""
+
     strvalue = metadata.getVar(varname, False)
     if strvalue is None:
         return None
@@ -174,7 +207,7 @@ def bbvalue(varname, metadata):
     if sigtup in bbvalue.memory:
         return bbvalue.memory[sigtup]
  
-    value = parse(strvalue, metadata)
+    value = bbparse(strvalue, metadata)
     if metadata.getVarFlag(varname, "func"):
         if metadata.getVarFlag(varname, "python"):
             value = PythonSnippet(metadata, [value])
@@ -185,15 +218,9 @@ def bbvalue(varname, metadata):
 
     return value
 
-def shvalue(varname, metadata):
-    return ShellSnippet(metadata, [parse(varname, metadata)])
-
-def pyvalue(varname, metadata):
-    return PythonSnippet(metadata, [parse(varname, metadata)])
-
 bbvalue.memory = {}
 
-def parse(str, metadata):
+def bbparse(str, metadata):
     """Parses a metadata string into a value Abstract Syntax Tree (AST) which
        represents the structure of that string."""
 
@@ -237,4 +264,17 @@ def parse(str, metadata):
         return parent
 
     return _parse(Tokenizer(str), Compound(metadata))
+
+def shparse(str, metadata):
+    """Constructs a new shell value from a variable defined in the BitBake
+       metadata."""
+  
+    return ShellSnippet(metadata, [bbparse(str, metadata)])
+
+def pyparse(str, metadata):
+    """Constructs a new Python value from a variable defined in the BitBake
+       metadata."""
+  
+    return PythonSnippet(metadata, [bbparse(str, metadata)])
+
 

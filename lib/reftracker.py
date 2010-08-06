@@ -315,7 +315,7 @@ def referencesFromName(varname, metadata):
     varrefs = metadata.getVarFlag(varname, "varrefs")
     if varrefs:
         refs.update(references(varrefs, metadata))
-        patterns = str(bbvalue.parse(varrefs, metadata)).split()
+        patterns = str(bbvalue.bbparse(varrefs, metadata)).split()
         for key in metadata.keys():
             if any(fnmatchcase(key, pat) for pat in patterns):
                 refs.add(key)
