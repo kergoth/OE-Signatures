@@ -13,21 +13,16 @@ and in the future, will allow bitbake to move away from the "stamp" concept
 entirely, instead relying on tracking of the input and output of tasks, and
 the pieces of the metadata they use.
 
-It is my belief that this can lead to us avoiding reparsing everything when a
-configuration file changes, as we could record 'dirty' state information and
-propogate it through the variable references, to update the changed variables.
+Beyond signature generation, we should be able to leverage this to allow us to
+avoid reparsing recipes when configuration files change, as we can more
+intelligently dirty the cached variable expansions with this knowledge.
 
 
 Recommendations for Exception Handling
 ------------------------------
 
-- When constructing a Value, catch SyntaxError (if there may be a python
-  snippet).
-- When constructing a ShellValue, catch ShellSyntaxError, and
-  NotImplementedError.
-- When constructing a PythonValue, catch SyntaxError.
-- When constructing a value via the new_value factory, catch all of the above.
-
+- When using a RefTracker or calling the convenience functions in reftracker,
+  catch SyntaxError, ShellSyntaxError, and RecursionError.
 - When resolving (or converting to a string), catch RecursionError,
   SyntaxError, and PythonExpansionError.
 
@@ -35,20 +30,34 @@ Recommendations for Exception Handling
 TODO
 ----
 
-- Top Priority Tasks
+- Values and Reference Tracking
 
-  - Finish populating all remaining needed varrefs flags for OE per the
-    current warnings, and per the task variable tracking comparison.
-  - Do extensive profiling to improve performance
-  - Alter BitBake to store the methodpool functions and event handlers in the
-    metadata, in addition to storing the function objects in their respective
-    stores.
+  - Add new fields to a Compound which handle lazy "prepend" and "append" from
+    the metadata.  This is necessary, because we don't want the append/prepend
+    to occur until resolve-time or finalize-time, but we may be constructing
+    the objects sooner than that.
+  - Create a subclass of Compound which associates a conditional with the
+    compound value, to implement conditional append/prepend with the
+    aforementioned fields
+  - Potentially resurrect the inclusion of the list of nodes in the cycle in a
+    RecursionError
+  - Handle non-string objects:
 
-- General
+    - Either convert non-string objects to a string before parsing them, or do
+      not parse them at all
+    - Run str() on self.value in Literal
+    - Run str() on the object which comes out of the metadata, in VariableRef
 
-  - Revisit file:// URI usage and FILESPATH -- ideally, we can avoid every
-    usage of FILESPATH and OVERRIDES pulling in MACHINE, by capturing the
-    resolved versions of the uris to actual disk paths in the signature.
+- Signatures
+
+  - Consider how to avoid inclusion of particular items from OVERRIDES in the
+    signature, by determining which of those overrides have actually applied
+    to this metadata:
+
+    - Determine if any override specific variables been set
+    - Determine if any override specific appends/prepends have occurred
+    - Determine if any override specific file:// files will be used
+
   - We need a way to handle variable references from code in the bb and oe
     python packages.  Either we try to read in the .py files, compile to an
     ast, and analyze the functions from those that we call, or we need to set
@@ -56,58 +65,55 @@ TODO
     need to set it for every variable that calls the function, or we need to
     store, somewhere, a mapping of bb/oe function to a list of additional
     varrefs.
-  - Think about how best to handle the nested VariableRef issue.  If you have
-    a value ${${FOO} bar} and FOO is foo, ideally we'd resolve from bottom to
-    top and record each reference, so that e.g. in this case we know that we
-    reference both the FOO variable and the 'foo bar' variable.
-  - Think about storing the PythonValue ast and utilizing it in PythonSnippet
-    to compile the code from that, rather than having it re-parse the string.
-    The 'compile' function can compile an ast object directly.
+
+- Pysh
+
   - Handle the 'rogue dollar sign' case in shell more sanely.  Most shells
     seem just fine with 'install -d ${D}$', as the trailing $ ends up a part
     of the filename.  pysh chokes on it, however, since it's expecting to see
     the remainder of a ${} expansion.
   - Fix the AND-OR async issue in a way that can go upstream.
-  - The path information for the runtime recursion check appears to leave out
-    the top element, at least in some cases.
-  - Consider reworking the classes to be more data only nodes in a tree with
-    traversal tools, like traditional AST / semantic model, rather than the
-    current method.  While the current method of including behavior in the
-    classes is nicer from that perspective, it scatters the tree traversal
-    code across the nodes, and that behavior is fairly common.
 
 - BitBake Integration
 
-  - Teach the Value objects to append/prepend to one another, as this is
-    necessary to handle the append/prepend operations from the files we
-    parse.
-  - Try constructing the Value objects directly from the AST statements and
-    storing it in the metadata rather than a string.
-  - Determine how to handle Value objects with regard to the COW metadata
-    objects.  Should getvar return a new value bound to the current object,
-    or should the original know something about the layering?  I expect the
-    former, but needs thought.
-  - Longer term: potentially construct non-string values based on flags.
+  - Store methodpool functions in the metadata.
+  - Add a method or methods to DataSmart which pull information about
+    variables using the RefTracker.
+  - Add a function similar to RP's emit_func, which leverages our shell
+    parsing to get just the 'execs' for a function, to determine what other
+    shell functions need to be emitted.  This is a good initial step, as it
+    will not require full usage of the 'varrefs' flags in the metadata, the
+    way the bitbake variable reference tracking does.
+
+  - Alter DataSmart to know about bbvalue objects
+
+    - Cache both the expanded value and the RefTracker data for variables.
+    - Utilize the references information to more intelligently dirty cached
+      information.
+    - getVar must hand back a new copy of a bbvalue object bound to self, if
+      we've retrieved an object from a previous datastore in the stack
+    - Determine a good API for the retrieval of RefTracker data from the
+      metadata -- we could simply add methods which are the same as the
+      convenience functions in reftracker.py, or we could add a single method
+      which returns a RefTracker object, or we could add faux flags (RP's
+      idea).
+
+  - Determine how to avoid reparsing recipes when a change occurs to a
+    configuration file
+
+    - Create a store which associates each bitbake file to the metadata object
+      it's associated with, potentially as a list in parse order
+    - Adjust VariableRef to always operate based upon the "current" metadata,
+      potentially by using the last item in the file<->metadata mapping store
+    - Alter getVar so instead of attempting to return a "copy" (from the
+      Copy-On-Write implementation) of the bbvalue object, it instead returns
+      a new bbvalue object which contains the old one.  The new one would be
+      associated with the current metadata, but the old still associated with
+      the old
 
 - Cleanup
 
-  - Potentially, we could either move bits out of parse() to make them more
-    lazy, likely via properties, or we could move more into parse, to do as
-    much as we can up front, or somewhere in between.  Not sure what's best.
-    Also, doing this much called via the constructor could be bad, maybe we
-    should move that logic into a factory, since its more about how this
-    thing is created than anything else..
   - In pysh, add Case support to format_commands.
-  - Split up the python and shell unit tests into multiple tests in a suite
-    for each, rather than one big string that tries to do it all.  Note that I
-    have started splitting up the shell test as a part of the work to support
-    case statements.
-
-  - Sanitize the property names amongst the Value implementations
-
-    - Rename 'references', as it is specifically references to variables in
-      the metadata.  This isn't the only type of reference we have anymore, as
-      we'll also be tracking calls to the methods in the methodpool.
 
 - Performance
 
@@ -116,14 +122,6 @@ TODO
   - In addition to caching/memoization, once we add dirty state tracking,
     it'd be possible to pre-generate the expanded version, to reduce the
     amount of work at str/getVar time.
-  - May want to add a tree simplification phase.  If a Value contains only
-    one component, the wrapping Value could go away in favor of the
-    underlying object, reducing the amount of tree traversal necessary to do
-    the resolve/expansion operation.
-
-    - Tested a first attempt at this, results in the recursion checks
-      failing to do their jobs for some reason.  Needs further
-      investigation.
 
 Known Issues / Concerns
 -----------------------
