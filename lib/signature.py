@@ -54,6 +54,8 @@ class Signature(object):
             else:
                 self.blacklist = None
 
+        self.build_signature()
+
     def __repr__(self):
         return "Signature(%s, %s, %s)" % (self.metadata, self.keys, self.blacklist)
 
@@ -68,60 +70,6 @@ class Signature(object):
     def hash(self):
         """Return an integer version of the signature"""
         return int(self.md5.hexdigest(), 16)
-
-    @property
-    def md5(self):
-        """The underlying python 'md5' object"""
-
-        value = self._md5
-        if value is None:
-            value = self._md5 = hashlib.md5(self.data_string)
-        return value
-
-    @property
-    def data_string(self):
-        """Stabilized string representation of the data to be hashed"""
-        string = self._data_string
-        if string is None:
-            string = self._data_string = stable_repr(self.data)
-        return string
-
-    @property
-    def data(self):
-        """The object containing the data which will be converted to a string and then hashed"""
-
-        if self._data:
-            return self._data
-
-        seen = set()
-        def data_for_hash(key):
-            """Returns an iterator over the variable names and their values, including references"""
-
-            if key in seen:
-                return
-            seen.add(key)
-            if self.is_blacklisted(key):
-                return
-
-            valstr = self.metadata.getVar(key, False)
-            if valstr is not None:
-                try:
-                    value = self.transform_blacklisted(
-                        bbvalue.bbvalue(key, self.metadata))
-                except (SyntaxError, NotImplementedError,
-                        bbvalue.PythonExpansionError, 
-                        bbvalue.RecursionError), exc:
-                    msg.error(None, "Unable to parse %s, excluding from signature: %s" %
-                                 (key, exc))
-                else:
-                    yield key, value
-
-                    for ref in reftracker.references(value, self.metadata):
-                        for other in data_for_hash(ref):
-                            yield other
-
-        data = self._data = dict(chain(*[data_for_hash(key) for key in self.keys]))
-        return data
 
     def is_blacklisted(self, item):
         """Determine if the supplied item is blacklisted"""
@@ -158,3 +106,34 @@ class Signature(object):
                 return black
         return item
 
+    def build_signature(self):
+        def data_for_hash(key, seen):
+            """Returns an iterator over the variable names and their values, including references"""
+
+            if key in seen:
+                return
+            seen.add(key)
+            if self.is_blacklisted(key):
+                return
+
+            valstr = self.metadata.getVar(key, False)
+            if valstr is not None:
+                try:
+                    value = self.transform_blacklisted(
+                        bbvalue.bbvalue(key, self.metadata))
+                except (SyntaxError, NotImplementedError,
+                        bbvalue.PythonExpansionError, 
+                        bbvalue.RecursionError), exc:
+                    msg.error(None, "Unable to parse %s, excluding from signature: %s" %
+                                 (key, exc))
+                else:
+                    yield key, value
+
+                    for ref in reftracker.references(value, self.metadata):
+                        for other in data_for_hash(ref, seen):
+                            yield other
+
+        seen = set()
+        self.data = dict(chain(*[data_for_hash(key, seen) for key in self.keys]))
+        self.data_string = stable_repr(self.data)
+        self.md5 = hashlib.md5(self.data_string)
