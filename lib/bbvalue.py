@@ -78,7 +78,7 @@ class Value(object):
         return self.resolve()
 
 class Literal(Value):
-    """A simple value that resolves to whatever string it was initialized 
+    """A simple value that resolves to whatever string it was initialized
        with."""
 
     def __init__(self, metadata, value):
@@ -90,7 +90,7 @@ class Literal(Value):
 
     def __hash__(self):
         return hash((self.value, id(self.metadata)))
-  
+
     def __repr__(self):
         return "Literal(%s, %s)" % (repr(self.metadata), self.value)
 
@@ -112,7 +112,7 @@ class Compound(Value):
 
     def __hash__(self):
         return hash((repr(self), id(self.metadata)))
-  
+
     def __repr__(self):
         return "%s(%s, %s)" % (self.__class__.__name__,
                                repr(self.metadata),
@@ -144,9 +144,6 @@ class PythonValue(Compound):
        The resolution of a PythonValue takes the resolution of its
        components and returns that resolution as evaluated by Python."""
 
-    def __init__(self, metadata, components=[]):
-        Compound.__init__(self, metadata, components)
-
     def resolve(self):
         codestr = super(PythonValue, self).resolve()
         codeobj = compile(codestr.strip(), "<expansion>", "eval")
@@ -157,8 +154,8 @@ class PythonValue(Compound):
         return bbparse(value, self.metadata).resolve()
 
 class VariableRef(Compound):
-    """A compound value which holds a reference to another value.  The 
-       resolution of a CompundValue dereferences the value referenced and 
+    """A compound value which holds a reference to another value.  The
+       resolution of a CompundValue dereferences the value referenced and
        returns the resolution of the dereferenced value."""
 
     def __init__(self, metadata, components=[]):
@@ -174,7 +171,7 @@ class VariableRef(Compound):
         refname = self.referred()
         if self.locked:
             raise RecursionError(refname)
- 
+
         newvalue = bbvalue(refname, self.metadata)
 
         self.locked = True
@@ -187,12 +184,10 @@ class VariableRef(Compound):
         return retvalue
 
 class ShellSnippet(Compound):
-    def __init__(self, metadata, components=[]):
-        Compound.__init__(self, metadata, components)
+    """A compound value which holds shell code"""
 
 class PythonSnippet(Compound):
-    def __init__(self, metadata, components=[]):
-        Compound.__init__(self, metadata, components)
+    """A compound value which holds python code"""
 
 def bbvalue(varname, metadata):
     """Constructs a new value from a variable defined in the BitBake
@@ -206,7 +201,7 @@ def bbvalue(varname, metadata):
 
     if sigtup in bbvalue.memory:
         return bbvalue.memory[sigtup]
- 
+
     value = bbparse(strvalue, metadata)
     if metadata.getVarFlag(varname, "func"):
         if metadata.getVarFlag(varname, "python"):
@@ -226,7 +221,7 @@ def bbparse(str, metadata):
 
     class Tokenizer(object):
         variable_ref = re.compile(r"(\$\{@|\$\{|\})")
-   
+
         def __init__(self, str):
             self.tokens = [var for var in Tokenizer.variable_ref.split(str)                                    if var]
             self.i = 0
@@ -247,7 +242,7 @@ def bbparse(str, metadata):
         while toker.current:
             token = toker.current
             if token in clsmap:
-                # Attempt to specutively parse the reference.  If the 
+                # Attempt to specutively parse the reference.  If the
                 # reference never closes, then revert to a literal.
                 value = _parse(toker.next(), clsmap[token](metadata))
                 if toker.current == "}":
@@ -268,13 +263,11 @@ def bbparse(str, metadata):
 def shparse(str, metadata):
     """Constructs a new shell value from a variable defined in the BitBake
        metadata."""
-  
+
     return ShellSnippet(metadata, [bbparse(str, metadata)])
 
 def pyparse(str, metadata):
     """Constructs a new Python value from a variable defined in the BitBake
        metadata."""
-  
+
     return PythonSnippet(metadata, [bbparse(str, metadata)])
-
-
