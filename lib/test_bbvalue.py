@@ -144,16 +144,16 @@ class TestMemoize(unittest.TestCase):
     def test_memoized(self):
         d = bb.data.init()
         d.setVar("FOO", "bar")
-        self.assertEqual(bbvalue.bbvalue("FOO", d),
-                         bbvalue.bbvalue("FOO", d))
+        self.assertTrue(bbvalue.bbvalue("FOO", d) is
+                        bbvalue.bbvalue("FOO", d))
 
     def test_not_memoized(self):
         d1 = bb.data.init()
         d2 = bb.data.init()
         d1.setVar("FOO", "bar")
         d2.setVar("FOO", "bar")
-        self.assertNotEqual(bbvalue.bbvalue("FOO", d1),
-                            bbvalue.bbvalue("FOO", d2))
+        self.assertTrue(bbvalue.bbvalue("FOO", d1) is not
+                        bbvalue.bbvalue("FOO", d2))
 
     def test_changed_after_memoized(self):
         d = bb.data.init()
