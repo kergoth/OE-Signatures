@@ -147,6 +147,9 @@ class TestBasic(TestRefTracking):
         self.d.setVar("FOO", "BAR")
         self.assertReferences("${${FOO}}", set(["FOO", "BAR"]))
 
+    def test_python_reference(self):
+        self.assertReferences("${@bb.data.getVar('BAR', d, True) + 'foo'}", set(["BAR"]))
+
 
 class TestContentsTracking(TestRefTracking):
     def setUp(self):
@@ -337,6 +340,6 @@ class TestPython(TestRefTracking):
             set([("testget", self.context["testget"])]))
         del self.context["testget"]
 
+
 if __name__ == "__main__":
     unittest.main()
-

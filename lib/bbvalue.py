@@ -144,9 +144,11 @@ class PythonValue(Compound):
        The resolution of a PythonValue takes the resolution of its
        components and returns that resolution as evaluated by Python."""
 
+    def code(self):
+        return super(PythonValue, self).resolve()
+
     def resolve(self):
-        codestr = super(PythonValue, self).resolve()
-        codeobj = compile(codestr.strip(), "<expansion>", "eval")
+        codeobj = compile(self.code().strip(), "<expansion>", "eval")
         try:
             value = str(utils.better_eval(codeobj, {"d": self.metadata}))
         except Exception, exc:

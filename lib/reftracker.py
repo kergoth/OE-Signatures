@@ -168,15 +168,17 @@ class RefTracker(bbvalue.Vistor):
 
         self.references.add(node.referred())
 
-    def visit_PythonSnippet(self, node):
+    def visit_PythonSnippet(self, node, code=None):
         for subnode in node.field_components:
             self.visit(subnode)
 
-        code = compile(dedent_python(str(node)), "<string>", "exec", 
-                       ast.PyCF_ONLY_AST)
+        if code is None:
+            code = dedent_python(str(node))
+
+        code_obj = compile(code, "<string>", "exec", ast.PyCF_ONLY_AST)
 
         self.visitor = self.ValueVisitor(node)
-        self.visitor.visit(code)
+        self.visitor.visit(code_obj)
 
         self.references.update(self.visitor.var_references)
         self.references.update(self.visitor.var_execs)
@@ -188,6 +190,9 @@ class RefTracker(bbvalue.Vistor):
                 self.function_references.add((var, func_obj))
             except (NameError, AttributeError):
                 pass
+
+    def visit_PythonValue(self, node):
+        self.visit_PythonSnippet(node, node.code().strip())
 
     def parse_shell(self, value):
         """Parse the supplied shell code in a string, returning the external
