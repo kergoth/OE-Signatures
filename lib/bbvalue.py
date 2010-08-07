@@ -202,7 +202,7 @@ def bbvalue(varname, metadata):
     if strvalue is None:
         return None
 
-    sigtup = (varname, strvalue, metadata)
+    sigtup = (varname, strvalue, id(metadata))
 
     if sigtup in bbvalue.memory:
         return bbvalue.memory[sigtup]
