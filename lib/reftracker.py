@@ -163,6 +163,9 @@ class RefTracker(bbvalue.Vistor):
                     self.references.add(var)
 
     def visit_VariableRef(self, node):
+        for subnode in node.field_components:
+            self.visit(subnode)
+
         self.references.add(node.referred())
 
     def visit_PythonSnippet(self, node):

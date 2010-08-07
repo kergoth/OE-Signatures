@@ -135,6 +135,19 @@ END
         self.assertExecs(shstr, set(["install"]))
 
 
+class TestBasic(TestRefTracking):
+    def assertReferences(self, value, refs):
+        super(TestBasic, self).assertReferences(
+            bbvalue.bbparse(value, self.d), refs)
+
+    def test_simple_reference(self):
+        self.assertReferences("${FOO}", set(["FOO"]))
+
+    def test_nested_reference(self):
+        self.d.setVar("FOO", "BAR")
+        self.assertReferences("${${FOO}}", set(["FOO", "BAR"]))
+
+
 class TestContentsTracking(TestRefTracking):
     def setUp(self):
         super(TestContentsTracking, self).setUp()
