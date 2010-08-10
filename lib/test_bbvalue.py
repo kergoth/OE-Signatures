@@ -196,6 +196,30 @@ class TestLazy(unittest.TestCase):
         value.append(bbvalue.bbparse(":val2", self.metadata))
         self.assertEqual(value.resolve(), "foo:val:val2:bar")
 
+class TestConditional(unittest.TestCase):
+    def setUp(self):
+        self.metadata = bb.data.init()
+        self.metadata.setVar("OVERRIDES", "foo:bar:local")
+        self.metadata.setVar("TEST", "testvalue")
+
+    def test_no_condition(self):
+        value = bbvalue.Conditional(self.metadata, None,
+                                    [bbvalue.bbvalue("TEST", self.metadata)])
+        self.assertEqual(value.resolve(), "testvalue")
+
+    def test_true_condition(self):
+        value = bbvalue.Conditional(self.metadata,
+                                    lambda d: 'foo' in d.getVar("OVERRIDES", True).split(":"),
+                                    [bbvalue.bbvalue("TEST", self.metadata)])
+        self.assertEqual(value.resolve(), "testvalue")
+
+    def test_false_condition(self):
+        value = bbvalue.Conditional(self.metadata,
+                                    lambda d: 'foo' in d.getVar("OVERRIDES", True).split(":"),
+                                    [bbvalue.bbvalue("TEST", self.metadata)])
+        self.metadata.setVar("OVERRIDES", "bar:local")
+        self.assertEqual(value.resolve(), "")
+
 if __name__ == "__main__":
     unittest.main()
 

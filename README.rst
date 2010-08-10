@@ -32,9 +32,6 @@ TODO
 
 - Values and Reference Tracking
 
-  - Create a subclass of Compound which associates a conditional with the
-    compound value, to implement conditional append/prepend with the
-    aforementioned fields
   - Potentially resurrect the inclusion of the list of nodes in the cycle in a
     RecursionError
   - Handle non-string objects:

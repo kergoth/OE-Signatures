@@ -236,6 +236,22 @@ class ShellSnippet(Compound):
 class PythonSnippet(Compound):
     """A compound value which holds python code"""
 
+class Conditional(Compound):
+    """A Compound which resolves to its components only when the associated
+       condition is true.  The condition is a function which is passed the
+       metadata instance, and returns a boolean result.  A condition of 'None'
+       is equivalent to an unconditional value."""
+
+    def __init__(self, metadata, condition=None, components=[]):
+        super(Conditional, self).__init__(metadata, components)
+        self.condition = condition
+
+    def resolve(self):
+        if self.condition is None or self.condition(self.metadata):
+            return super(Conditional, self).resolve()
+        else:
+            return ""
+
 def bbvalue(varname, metadata):
     """Constructs a new value from a variable defined in the BitBake
        metadata."""
