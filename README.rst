@@ -34,12 +34,6 @@ TODO
 
   - Potentially resurrect the inclusion of the list of nodes in the cycle in a
     RecursionError
-  - Handle non-string objects:
-
-    - Either convert non-string objects to a string before parsing them, or do
-      not parse them at all
-    - Run str() on self.value in Literal
-    - Run str() on the object which comes out of the metadata, in VariableRef
 
 - Signatures
 

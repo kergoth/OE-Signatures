@@ -97,6 +97,11 @@ class TestSimpleExpansions(unittest.TestCase):
         val = bbvalue.shparse("sed -i -e 's:IP{:I${:g' $pc", self.d)
         self.assertEqual(str(val), "sed -i -e 's:IP{:I${:g' $pc")
 
+    def test_nonstring(self):
+        self.d.setVar("TEST", 5)
+        val = bbvalue.bbvalue("TEST", self.d)
+        self.assertEqual(str(val), "5")
+
 class TestNestedExpansions(unittest.TestCase):
     def setUp(self):
         self.d = bb.data.init()

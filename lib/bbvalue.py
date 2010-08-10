@@ -93,10 +93,10 @@ class Literal(Value):
         return hash((self.value, id(self.metadata)))
 
     def __repr__(self):
-        return "Literal(%s, %s)" % (repr(self.metadata), self.value)
+        return "Literal(%s, %s)" % (repr(self.metadata), repr(self.value))
 
     def resolve(self):
-        return self.value
+        return str(self.value)
 
 class Compound(Value):
     """Compound values are composed of other compound values
@@ -264,6 +264,9 @@ def bbvalue(varname, metadata):
 
     if sigtup in bbvalue.memory:
         return bbvalue.memory[sigtup]
+
+    if not isinstance(strvalue, basestring):
+        return Literal(metadata, strvalue)
 
     value = bbparse(strvalue, metadata)
     if metadata.getVarFlag(varname, "func"):
