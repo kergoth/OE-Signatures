@@ -111,10 +111,6 @@ TODO
       associated with the current metadata, but the old still associated with
       the old
 
-- Cleanup
-
-  - In pysh, add Case support to format_commands.
-
 - Performance
 
   - Check the memory impact of potentially using Value objects rather than
