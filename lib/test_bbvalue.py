@@ -97,7 +97,6 @@ class TestSimpleExpansions(unittest.TestCase):
         val = bbvalue.shparse("sed -i -e 's:IP{:I${:g' $pc", self.d)
         self.assertEqual(str(val), "sed -i -e 's:IP{:I${:g' $pc")
 
-
 class TestNestedExpansions(unittest.TestCase):
     def setUp(self):
         self.d = bb.data.init()
@@ -169,6 +168,33 @@ class TestMemoize(unittest.TestCase):
         d.setVar("bar", "value of")
         self.assertEqual(bbvalue.bbvalue("foo", d),
                          bbvalue.bbvalue("bar", d))
+
+class TestLazy(unittest.TestCase):
+    def setUp(self):
+        self.metadata = bb.data.init()
+        self.metadata.setVar("FOO", "foo")
+        self.metadata.setVar("VAL", "val")
+        self.metadata.setVar("BAR", "bar")
+
+    def test_prepend(self):
+        value = bbvalue.LazyCompound(self.metadata)
+        value.append(bbvalue.bbvalue("VAL", self.metadata))
+        value.lazy_prepend(bbvalue.bbparse("${FOO}:", self.metadata))
+        self.assertEqual(value.resolve(), "foo:val")
+
+    def test_append(self):
+        value = bbvalue.LazyCompound(self.metadata)
+        value.append(bbvalue.bbvalue("VAL", self.metadata))
+        value.lazy_append(bbvalue.bbparse(":${BAR}", self.metadata))
+        self.assertEqual(value.resolve(), "val:bar")
+
+    def test_normal_append(self):
+        value = bbvalue.LazyCompound(self.metadata)
+        value.append(bbvalue.bbvalue("VAL", self.metadata))
+        value.lazy_prepend(bbvalue.bbparse("${FOO}:", self.metadata))
+        value.lazy_append(bbvalue.bbparse(":${BAR}", self.metadata))
+        value.append(bbvalue.bbparse(":val2", self.metadata))
+        self.assertEqual(value.resolve(), "foo:val:val2:bar")
 
 if __name__ == "__main__":
     unittest.main()

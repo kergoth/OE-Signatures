@@ -4,6 +4,7 @@
 
 import re
 from collections import deque
+from itertools import chain
 import bb.data
 from bb import msg, utils
 
@@ -118,17 +119,21 @@ class Compound(Value):
                                repr(self.metadata),
                                repr(self.field_components))
 
-    def append(self, value):
-        """Append a new value to the compound value."""
+    @staticmethod
+    def _append(value, field):
+        """Append a new value to a field, coalescing adjacent Literals"""
 
         def can_coalesce(a, b):
             return isinstance(a, Literal) and isinstance(b, Literal)
 
-        comps = self.field_components
-        if len(comps) > 0 and can_coalesce(comps[-1], value):
-            comps[-1].value += value.value
+        if len(field) > 0 and can_coalesce(field[-1], value):
+            field[-1].value += value.value
         else:
-            comps.append(value)
+            field.append(value)
+
+    def append(self, value):
+        """Append a new value to the compound value."""
+        return self._append(value, self.field_components)
 
     def extend(self, values):
         """Extend the compound value with a sequence of values."""
@@ -138,6 +143,46 @@ class Compound(Value):
 
     def resolve(self):
         return "".join(c.resolve() for c in self.field_components)
+
+class LazyCompound(Compound):
+    """A Compound value which composes 3 independent lists of components:
+       prepended, normal, and appended.  This is specifically to facilitate
+       OpenEmbedded's _append/_prepend, which are not evaluated until the
+       end of the processing.  In this implementation, they're applied at
+       resolve time."""
+
+    def __init__(self, metadata, components=[], append=[], prepend=[]):
+        Compound.__init__(self, metadata, components)
+        self.field_prepend = prepend[:]
+        self.field_append = append[:]
+
+    def __eq__(self, other):
+        return Compound.__eq__(self, other) and \
+               self.field_prepend == other.field_prepend and \
+               self.field_append == other.field_append
+
+    def __hash__(self):
+        return hash((repr(self), id(self.metadata)))
+
+    def __repr__(self):
+        return "%s(%s, %s, %s, %s)" % (self.__class__.__name__,
+                                       repr(self.metadata),
+                                       repr(self.field_components),
+                                       repr(self.field_append),
+                                       repr(self.field_prepend))
+
+    def lazy_prepend(self, value):
+        """Add a value to the list of values to be prepended"""
+        return self._append(value, self.field_prepend)
+
+    def lazy_append(self, value):
+        """Add a value to the list of values to be appended"""
+        return self._append(value, self.field_append)
+
+    def resolve(self):
+        components = chain(self.field_prepend, self.field_components,
+                           self.field_append)
+        return "".join(c.resolve() for c in components)
 
 class PythonValue(Compound):
     """A compound value that represents a value to be evaluated in Python.

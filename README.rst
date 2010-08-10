@@ -32,10 +32,6 @@ TODO
 
 - Values and Reference Tracking
 
-  - Add new fields to a Compound which handle lazy "prepend" and "append" from
-    the metadata.  This is necessary, because we don't want the append/prepend
-    to occur until resolve-time or finalize-time, but we may be constructing
-    the objects sooner than that.
   - Create a subclass of Compound which associates a conditional with the
     compound value, to implement conditional append/prepend with the
     aforementioned fields
