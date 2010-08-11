@@ -313,9 +313,8 @@ def references(value, metadata):
     tracker.visit(value)
     return tracker.references
 
-def referencesFromName(varname, metadata):
-    refs = references(bbvalue.bbvalue(varname, metadata), metadata)
-     
+def references_from_flags(varname, metadata):
+    refs = set()
     dirs = metadata.getVarFlag(varname, "dirs")
     if dirs:
         refs.update(references(dirs, metadata))
@@ -328,6 +327,11 @@ def referencesFromName(varname, metadata):
             if any(fnmatchcase(key, pat) for pat in patterns):
                 refs.add(key)
 
+    return refs
+
+def references_from_name(varname, metadata):
+    refs = references(bbvalue.bbvalue(varname, metadata), metadata)
+    refs |= references_from_flags(varname, metadata)
     return refs
 
 def execs(value, metadata):

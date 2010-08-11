@@ -129,7 +129,9 @@ class Signature(object):
                 else:
                     yield key, value
 
-                    for ref in reftracker.references(value, self.metadata):
+                    refs = reftracker.references(value, self.metadata)
+                    refs |= reftracker.references_from_flags(key, self.metadata)
+                    for ref in refs:
                         for other in data_for_hash(ref, seen):
                             yield other
 

@@ -237,21 +237,21 @@ class TestContentsTracking(TestRefTracking):
         self.d.setVar("oe_libinstall", "echo test")
         self.d.setVar("FOO", "foo=oe_libinstall; eval $foo")
         self.d.setVarFlag("FOO", "varrefs", "oe_libinstall")
-        self.assertEqual(reftracker.referencesFromName("FOO", self.d),
+        self.assertEqual(reftracker.references_from_name("FOO", self.d),
                          set(["oe_libinstall"]))
 
     def test_varrefs_expand(self):
         self.d.setVar("oe_libinstall", "echo test")
         self.d.setVar("FOO", "foo=oe_libinstall; eval $foo")
         self.d.setVarFlag("FOO", "varrefs", "${@'oe_libinstall'}")
-        self.assertEqual(reftracker.referencesFromName("FOO", self.d),
+        self.assertEqual(reftracker.references_from_name("FOO", self.d),
                          set(["oe_libinstall"]))
 
     def test_varrefs_wildcards(self):
         self.d.setVar("oe_libinstall", "echo test")
         self.d.setVar("FOO", "foo=oe_libinstall; eval $foo")
         self.d.setVarFlag("FOO", "varrefs", "oe_*")
-        self.assertEqual(reftracker.referencesFromName("FOO", self.d),
+        self.assertEqual(reftracker.references_from_name("FOO", self.d),
                          set(["oe_libinstall"]))
 
 class TestPython(TestRefTracking):

@@ -93,6 +93,13 @@ class TestSignatureGeneration(unittest.TestCase):
         sig = signature.Signature(self.d, keys=["alpha"])
         self.assertEquals(set(sig.data.keys()), set(["alpha", "beta", "theta"]))
 
+    def test_varrefs(self):
+        self.d.setVar("alpha", "${@bb.data.getVar('foo' + '5', d, True)}")
+        self.d.setVarFlag("alpha", "varrefs", "foo5")
+        self.d.setVar("foo5", "test")
+        sig = signature.Signature(self.d, keys=["alpha"])
+        self.assertEquals(set(sig.data), set(["alpha", "foo5"]))
+
 
 class TestOEData(unittest.TestCase):
     import pickle
