@@ -9,34 +9,6 @@ from bb import msg, utils
 
 from pysh.sherrors import ShellSyntaxError
 
-from tokenize import generate_tokens, untokenize, INDENT, DEDENT
-try:
-    from cStringIO import StringIO
-except ImportError:
-    from StringIO import StringIO
-
-def dedent_python(codestr):
-    """Remove the first level of indentation from a block of python code"""
-
-    indent = None
-    level = 0
-    tokens = []
-    for toknum, tokval, _, _, _ in generate_tokens(StringIO(codestr).readline):
-        if toknum == INDENT:
-            level += 1
-            if level == 1:
-                indent = tokval
-                continue
-            elif indent:
-                tokval = tokval[len(indent):]
-        elif toknum == DEDENT:
-            level -= 1
-            if level == 0:
-                indent = None
-                continue
-        tokens.append((toknum, tokval))
-    return untokenize(tokens)
-
 class RefTracker(bbvalue.Vistor):
     class ValueVisitor(ast.NodeVisitor):
         """Visitor to traverse a python abstract syntax tree and obtain
@@ -148,6 +120,10 @@ class RefTracker(bbvalue.Vistor):
         self.function_references = set()
         self.calls = None
 
+    @staticmethod
+    def correct_indent(codestr):
+        return "def _():\n%s" % codestr
+
     def visit_ShellSnippet(self, node):
         for subnode in node.field_components:
             self.visit(subnode)
@@ -173,7 +149,7 @@ class RefTracker(bbvalue.Vistor):
             self.visit(subnode)
 
         if code is None:
-            code = dedent_python(str(node))
+            code = self.correct_indent(str(node))
 
         code_obj = compile(code, "<string>", "exec", ast.PyCF_ONLY_AST)
 

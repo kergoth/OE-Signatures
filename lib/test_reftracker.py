@@ -262,22 +262,28 @@ class TestPython(TestRefTracking):
         else:
             import __builtin__
             self.context = __builtin__.__dict__
-  
+
+    @staticmethod
+    def indent(value):
+        """Python Snippets have to be indented, python values don't have to
+        be.  These unit tests are testing snippets."""
+        return "  " + value
+
     def assertReferences(self, value, refs):
         super(TestPython, self).assertReferences(
-            bbvalue.pyparse(value, self.d), refs)
+            bbvalue.pyparse(self.indent(value), self.d), refs)
 
     def assertExecs(self, value, execs):
         super(TestPython, self).assertExecs(
-            bbvalue.pyparse(value, self.d), execs)
+            bbvalue.pyparse(self.indent(value), self.d), execs)
 
     def assertCalls(self, value, calls):
         super(TestPython, self).assertCalls(
-            bbvalue.pyparse(value, self.d), calls)
+            bbvalue.pyparse(self.indent(value), self.d), calls)
 
     def assertFunctionReferences(self, value, refs):
         super(TestPython, self).assertFunctionReferences(
-            bbvalue.pyparse(value, self.d), refs)
+            bbvalue.pyparse(self.indent(value), self.d), refs)
 
     def test_getvar_reference(self):
         pystr = "bb.data.getVar('foo', d, True)"
