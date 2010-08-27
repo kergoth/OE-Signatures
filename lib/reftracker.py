@@ -212,7 +212,7 @@ class RefTracker(bbvalue.Vistor):
                 return chain(main, rest)
 
         def simple_command(value):
-            return None, chain(value.words, 
+            return None, chain(value.words,
                                (assign[1] for assign in value.assigns))
 
         token_handlers = {
@@ -275,7 +275,7 @@ class RefTracker(bbvalue.Vistor):
 
                 cmd = word[1]
                 if cmd.startswith("$"):
-                    msg.debug(1, None, 
+                    msg.debug(1, None,
                         "Warning: execution of non-literal command '%s'" % cmd)
                 elif cmd == "eval":
                     command = " ".join(word for _, word in words[1:])

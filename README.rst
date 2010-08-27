@@ -39,9 +39,12 @@ TODO
 
   - Consider how to avoid inclusion of particular items from OVERRIDES in the
     signature, by determining which of those overrides have actually applied
-    to this metadata:
+    to this metadata.  We should be able to do this entirely in the metadata.
+    We can have an anonymous python function or event handler determine the
+    following, then add MACHINE to BB_HASH_BLACKLIST as appropriate if none of
+    the below have occurred.
 
-    - Determine if any override specific variables been set
+    - Determine if any override specific variables have been set
     - Determine if any override specific appends/prepends have occurred
     - Determine if any override specific file:// files will be used
 
