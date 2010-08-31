@@ -54,6 +54,7 @@ class Signature(object):
             else:
                 self.blacklist = None
 
+        self.blacklister = bbvalue.Blacklister(self.is_blacklisted)
         self.build_signature()
 
     def __repr__(self):
@@ -72,39 +73,10 @@ class Signature(object):
         return int(self.md5.hexdigest(), 16)
 
     def is_blacklisted(self, item):
-        """Determine if the supplied item is blacklisted"""
-
-        if not self.blacklist:
-            return
-
-        if isinstance(item, basestring):
-            valstr = item
-        elif all(isinstance(c, basestring) for c in item.components):
-            valstr = str(item.components)
-        else:
-            return
-
         for bl in self.blacklist:
-            if fnmatchcase(valstr, bl):
-                return "${%s}" % valstr
-
-    def transform_blacklisted(self, item):
-        """Transform the supplied item tree, changing all blacklisted objects
-        into their unexpanded forms.
-        """
-
-        if isinstance(item, bbvalue.PythonValue):
-            return bbvalue.Literal(self.metadata, str(item))
-        elif isinstance(item, bbvalue.Compound):
-            transformed = [self.transform_blacklisted(i) 
-                              for i in item.field_components]
-            if transformed != item.field_components:
-                return item.__class__(self.metadata, transformed)
-        elif isinstance(item, bbvalue.VariableRef):
-            black = self.is_blacklisted(item)
-            if black:
-                return black
-        return item
+            if fnmatchcase(item, bl):
+                return True
+        return False
 
     def build_signature(self):
         def data_for_hash(key, seen):
@@ -119,8 +91,7 @@ class Signature(object):
             valstr = self.metadata.getVar(key, False)
             if valstr is not None:
                 try:
-                    value = self.transform_blacklisted(
-                        bbvalue.bbvalue(key, self.metadata))
+                    value = self.blacklister.visit(bbvalue.bbvalue(key, self.metadata))
                 except (SyntaxError, NotImplementedError,
                         bbvalue.PythonExpansionError, 
                         bbvalue.RecursionError), exc:

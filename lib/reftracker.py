@@ -9,7 +9,7 @@ from bb import msg, utils
 
 from pysh.sherrors import ShellSyntaxError
 
-class RefTracker(bbvalue.Vistor):
+class RefTracker(bbvalue.Visitor):
     class ValueVisitor(ast.NodeVisitor):
         """Visitor to traverse a python abstract syntax tree and obtain
         the variables referenced via bitbake metadata APIs, and the external

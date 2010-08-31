@@ -140,7 +140,7 @@ class TestNestedExpansions(unittest.TestCase):
         self.assertEqual(str(val), "187")
 
     def test_runtime(self):
-        val = bbvalue.bbparse("${${@'value of' + ' f'+'o'+'o'+'b'+'a'+'r'}}", 
+        val = bbvalue.bbparse("${${@'value of' + ' f'+'o'+'o'+'b'+'a'+'r'}}",
                             self.d)
         self.assertEqual(str(val), "187")
 
@@ -224,6 +224,32 @@ class TestConditional(unittest.TestCase):
                                     [bbvalue.bbvalue("TEST", self.metadata)])
         self.metadata.setVar("OVERRIDES", "bar:local")
         self.assertEqual(value.resolve(), "")
+
+from fnmatch import fnmatchcase
+
+class TestTransformer(unittest.TestCase):
+    def setUp(self):
+        self.metadata = bb.data.init()
+        self.blacklist = ["bl*"]
+        self.blacklister = bbvalue.Blacklister(self.is_blacklisted)
+
+    def is_blacklisted(self, name):
+        return any(fnmatchcase(name, bl) for bl in self.blacklist)
+
+    def test_only_blacklisted(self):
+        self.metadata.setVar("blfoo", "bar")
+        value = bbvalue.bbparse("${blfoo}", self.metadata)
+        self.assertEqual(str(value), "bar")
+        blacklisted = self.blacklister.visit(value)
+        self.assertEqual(str(blacklisted), "${blfoo}")
+
+    def test_nested_blacklisted(self):
+        self.metadata.setVar("blfoo", "bar")
+        self.metadata.setVar("bar", "baz")
+        value = bbvalue.bbparse("${${blfoo}}", self.metadata)
+        self.assertEqual(str(value), "baz")
+        blacklisted = self.blacklister.visit(value)
+        self.assertEqual(str(blacklisted), "${${blfoo}}")
 
 if __name__ == "__main__":
     unittest.main()

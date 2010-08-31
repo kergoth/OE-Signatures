@@ -40,7 +40,7 @@ def iter_fields(node):
             except AttributeError:
                 pass
 
-class Vistor(object):
+class Visitor(object):
     def visit(self, node):
         """Visit a node."""
 
@@ -58,6 +58,54 @@ class Vistor(object):
                         self.visit(item)
             elif isinstance(value, Value):
                 self.visit(value)
+
+from copy import copy
+
+class Transformer(Visitor):
+    def generic_visit(self, node):
+        newdata = []
+        for field, value in iter_fields(node):
+            bb.note(str(self), field, str(value))
+            if isinstance(value, list):
+                newvalue = []
+                for item in value:
+                    if isinstance(item, Value):
+                        item = self.visit(item)
+                    newvalue.append(item)
+            elif isinstance(value, Value):
+                newvalue = self.visit(value)
+            else:
+                continue
+
+            if newvalue != value:
+                newdata.append((field, newvalue))
+
+        if newdata:
+            newnode = copy(node)
+            for field, value in newdata:
+                setattr(newnode, field, value)
+            return newnode
+        else:
+            return node
+
+class Blacklister(Transformer):
+    def __init__(self, is_blacklisted):
+        self.is_blacklisted = is_blacklisted
+        super(Blacklister, self).__init__()
+
+    def generic_visit(self, node):
+        newnode = super(Blacklister, self).generic_visit(node)
+        if node != newnode:
+            newnode.blacklisted = True
+        return newnode
+
+    def visit_VariableRef(self, node):
+        node = self.generic_visit(node)
+        name = node.referred()
+        if hasattr(node, "blacklisted") or self.is_blacklisted(name):
+            return Literal(node.metadata, "${%s}" % name)
+        else:
+            return node
 
 class Value(object):
     """A simple value that is meant as a base class for all other values."""
