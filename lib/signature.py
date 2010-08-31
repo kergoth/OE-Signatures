@@ -74,9 +74,10 @@ class Signature(object):
         return int(self.md5.hexdigest(), 16)
 
     def is_blacklisted(self, item):
-        for bl in self.blacklist:
-            if fnmatchcase(item, bl):
-                return True
+        if self.blacklist is not None:
+            for bl in self.blacklist:
+                if fnmatchcase(item, bl):
+                    return True
         return False
 
     def build_signature(self):
