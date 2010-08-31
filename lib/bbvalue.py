@@ -65,7 +65,6 @@ class Transformer(Visitor):
     def generic_visit(self, node):
         newdata = []
         for field, value in iter_fields(node):
-            bb.note(str(self), field, str(value))
             if isinstance(value, list):
                 newvalue = []
                 for item in value:
@@ -106,6 +105,37 @@ class Blacklister(Transformer):
             return Literal(node.metadata, "${%s}" % name)
         else:
             return node
+
+class Resolver(Transformer):
+    def __init__(self, metadata, crossref=True):
+        self.metadata = metadata
+        self.crossref = crossref
+        super(Resolver, self).__init__()
+
+    def generic_visit(self, node):
+        def values(node):
+            for _, value in iter_fields(node):
+                if isinstance(value, list):
+                    for item in value:
+                        yield self.visit(item)
+                elif isinstance(value, Value):
+                    yield self.visit(value)
+
+        node = super(Resolver, self).generic_visit(node)
+        return "".join(values(node))
+
+    def visit_str(self, node):
+        return node
+
+    def visit_Literal(self, node):
+        return node.value
+
+    def visit_VariableRef(self, node):
+        name = node.referred()
+        if self.crossref:
+            return self.visit(bbvalue(name, self.metadata))
+        else:
+            return "${%s}" % name
 
 class Value(object):
     """A simple value that is meant as a base class for all other values."""
@@ -385,3 +415,5 @@ def pyparse(str, metadata):
        metadata."""
 
     return PythonSnippet(metadata, [bbparse(str, metadata)])
+
+#  vim: set et fenc=utf-8 sts=4 sw=4 ts=4 :
