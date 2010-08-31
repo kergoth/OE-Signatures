@@ -21,7 +21,7 @@ def stable_repr(value):
         return "%s(%s)" % (value.__class__.__name__, 
                            stable_repr(value.field_components))
     elif isinstance(value, bbvalue.Literal):
-        return "Literal('%s')" % str(value)
+        return "Literal('%s')" % str(value.value)
     return repr(value)
 
 class Signature(object):
@@ -54,7 +54,7 @@ class Signature(object):
             else:
                 self.blacklist = None
 
-        self.blacklister = bbvalue.Blacklister(self.is_blacklisted)
+        self.blacklister = bbvalue.Blacklister(self.metadata, self.is_blacklisted)
         self.build_signature()
 
     def __repr__(self):

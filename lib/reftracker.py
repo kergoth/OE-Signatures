@@ -54,10 +54,11 @@ class RefTracker(bbvalue.Visitor):
             else:
                 return any(cls.compare_name(item, node) for item in value)
 
-        def __init__(self, value):
+        def __init__(self, value, metadata):
             self.var_references = set()
             self.var_execs = set()
             self.direct_func_calls = set()
+            self.metadata = metadata
             self.value = value
             ast.NodeVisitor.__init__(self)
 
@@ -87,7 +88,7 @@ class RefTracker(bbvalue.Visitor):
             elif self.compare_name(self.expands, node.func):
                 if isinstance(node.args[0], ast.Str):
                     self.var_references.update(references(node.args[0].s,
-                                               self.value.metadata))
+                                               self.metadata))
                 elif isinstance(node.args[0], ast.Call) and \
                      self.compare_name(self.getvars, node.args[0].func):
                     pass
@@ -113,12 +114,14 @@ class RefTracker(bbvalue.Visitor):
                     identifier = attr_node.id + "." + identifier
                 self.direct_func_calls.add(identifier)
 
-    def __init__(self):
+    def __init__(self, metadata):
         self.execs = set()
         self.references = set()
         self.funcdefs = set()
         self.function_references = set()
         self.calls = None
+        self.metadata = metadata
+        self.resolver = bbvalue.Resolver(metadata, True)
 
     @staticmethod
     def correct_indent(codestr):
@@ -128,9 +131,9 @@ class RefTracker(bbvalue.Visitor):
         for subnode in node.field_components:
             self.visit(subnode)
 
-        self.execs = self.parse_shell(str(node))
-        for var in node.metadata.keys():
-            flags = node.metadata.getVarFlags(var)
+        self.execs = self.parse_shell(self.resolver.visit(node))
+        for var in self.metadata.keys():
+            flags = self.metadata.getVarFlags(var)
             if flags:
                 if "export" in flags:
                     self.references.add(var)
@@ -142,18 +145,18 @@ class RefTracker(bbvalue.Visitor):
         for subnode in node.field_components:
             self.visit(subnode)
 
-        self.references.add(node.referred())
+        self.references.add(self.resolver.generic_visit(node))
 
     def visit_PythonSnippet(self, node, code=None):
         for subnode in node.field_components:
             self.visit(subnode)
 
         if code is None:
-            code = self.correct_indent(str(node))
+            code = self.correct_indent(self.resolver.visit(node))
 
         code_obj = compile(code, "<string>", "exec", ast.PyCF_ONLY_AST)
 
-        self.visitor = self.ValueVisitor(node)
+        self.visitor = self.ValueVisitor(node, self.metadata)
         self.visitor.visit(code_obj)
 
         self.references.update(self.visitor.var_references)
@@ -168,7 +171,8 @@ class RefTracker(bbvalue.Visitor):
                 pass
 
     def visit_PythonValue(self, node):
-        self.visit_PythonSnippet(node, node.code().strip())
+        code = self.resolver.generic_visit(node)
+        self.visit_PythonSnippet(node, code.strip())
 
     def parse_shell(self, value):
         """Parse the supplied shell code in a string, returning the external
@@ -285,7 +289,7 @@ class RefTracker(bbvalue.Visitor):
                 break
 
 def references(value, metadata):
-    tracker = RefTracker()
+    tracker = RefTracker(metadata)
     tracker.visit(value)
     return tracker.references
 
@@ -298,7 +302,7 @@ def references_from_flags(varname, metadata):
     varrefs = metadata.getVarFlag(varname, "varrefs")
     if varrefs:
         refs.update(references(varrefs, metadata))
-        patterns = str(bbvalue.bbparse(varrefs, metadata)).split()
+        patterns = bbvalue.resolve(bbvalue.bbparse(varrefs), metadata).split()
         for key in metadata.keys():
             if any(fnmatchcase(key, pat) for pat in patterns):
                 refs.add(key)
@@ -311,16 +315,16 @@ def references_from_name(varname, metadata):
     return refs
 
 def execs(value, metadata):
-    tracker = RefTracker()
+    tracker = RefTracker(metadata)
     tracker.visit(value)
     return tracker.execs
 
 def calls(value, metadata):
-    tracker = RefTracker()
+    tracker = RefTracker(metadata)
     tracker.visit(value)
     return tracker.calls
 
 def function_references(value, metadata):
-    tracker = RefTracker()
+    tracker = RefTracker(metadata)
     tracker.visit(value)
     return tracker.function_references

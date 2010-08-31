@@ -38,11 +38,11 @@ class TestShell(TestRefTracking):
 
     def assertReferences(self, value, refs):
         super(TestShell, self).assertReferences(
-            bbvalue.shparse(value, self.d), refs)
+            bbvalue.shparse(value), refs)
 
     def assertExecs(self, value, execs):
         super(TestShell, self).assertExecs(
-            bbvalue.shparse(value, self.d), execs)
+            bbvalue.shparse(value), execs)
 
     def test_quotes_inside_assign(self):
         self.assertReferences('foo=foo"bar"baz', set([]))
@@ -126,7 +126,7 @@ END
 
     def test_incomplete_command_expansion(self):
         self.assertRaises(reftracker.ShellSyntaxError, reftracker.execs,
-                          bbvalue.shparse("cp foo`", self.d), self.d)
+                          bbvalue.shparse("cp foo`"), self.d)
 
     def test_rogue_dollarsign(self):
         self.d.setVar("D", "/tmp")
@@ -138,7 +138,7 @@ END
 class TestBasic(TestRefTracking):
     def assertReferences(self, value, refs):
         super(TestBasic, self).assertReferences(
-            bbvalue.bbparse(value, self.d), refs)
+            bbvalue.bbparse(value), refs)
 
     def test_simple_reference(self):
         self.assertReferences("${FOO}", set(["FOO"]))
@@ -225,7 +225,7 @@ class TestContentsTracking(TestRefTracking):
         self.d.setVar("inverted", "echo inverted...")
         self.d.setVarFlag("inverted", "func", True)
 
-        shellval = bbvalue.shparse(self.shelldata, self.d)
+        shellval = bbvalue.shparse(self.shelldata)
         self.assertEquals(reftracker.references(shellval, self.d), 
                           set(["somevar", "inverted"]))
         self.assertEquals(reftracker.execs(shellval, self.d), 
@@ -271,19 +271,19 @@ class TestPython(TestRefTracking):
 
     def assertReferences(self, value, refs):
         super(TestPython, self).assertReferences(
-            bbvalue.pyparse(self.indent(value), self.d), refs)
+            bbvalue.pyparse(self.indent(value)), refs)
 
     def assertExecs(self, value, execs):
         super(TestPython, self).assertExecs(
-            bbvalue.pyparse(self.indent(value), self.d), execs)
+            bbvalue.pyparse(self.indent(value)), execs)
 
     def assertCalls(self, value, calls):
         super(TestPython, self).assertCalls(
-            bbvalue.pyparse(self.indent(value), self.d), calls)
+            bbvalue.pyparse(self.indent(value)), calls)
 
     def assertFunctionReferences(self, value, refs):
         super(TestPython, self).assertFunctionReferences(
-            bbvalue.pyparse(self.indent(value), self.d), refs)
+            bbvalue.pyparse(self.indent(value)), refs)
 
     def test_getvar_reference(self):
         pystr = "bb.data.getVar('foo', d, True)"
