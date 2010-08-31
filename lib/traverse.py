@@ -59,7 +59,6 @@ class Visitor(object):
             elif isinstance(value, bbvalue.Value):
                 self.visit(value)
 
-
 class Transformer(Visitor):
     def generic_visit(self, node):
         newdata = []
@@ -87,6 +86,9 @@ class Transformer(Visitor):
             return node
 
 class Resolver(Transformer):
+    """Convert a bbvalue tree into a string, optionally resolving
+       variable references"""
+
     def __init__(self, metadata, crossref=True):
         self.metadata = metadata
         self.crossref = crossref

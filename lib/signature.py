@@ -1,11 +1,10 @@
 import hashlib
 import bbvalue
-import bb.data
 import traverse
 import reftracker
 from fnmatch import fnmatchcase
 from itertools import chain
-from bb import msg, utils
+from bb import msg
 
 def stable_repr(value):
     """Produce a more stable 'repr' string for a value"""

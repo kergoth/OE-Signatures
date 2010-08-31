@@ -9,110 +9,112 @@ from bb import msg, utils
 
 from pysh.sherrors import ShellSyntaxError
 
-class RefTracker(traverse.Visitor):
-    class ValueVisitor(ast.NodeVisitor):
-        """Visitor to traverse a python abstract syntax tree and obtain
-        the variables referenced via bitbake metadata APIs, and the external
-        functions called.
+class ValueVisitor(ast.NodeVisitor):
+    """Visitor to traverse a python abstract syntax tree and obtain
+    the variables referenced via bitbake metadata APIs, and the external
+    functions called.
+    """
+
+    getvars = ("d.getVar", "bb.data.getVar", "data.getVar")
+    expands = ("d.expand", "bb.data.expand", "data.expand")
+    execs = ("bb.build.exec_func", "bb.build.exec_task")
+
+    @classmethod
+    def _compare_name(cls, strparts, node):
+        """Given a sequence of strings representing a python name,
+        where the last component is the actual Name and the prior
+        elements are Attribute nodes, determine if the supplied node
+        matches.
         """
 
-        getvars = ("d.getVar", "bb.data.getVar", "data.getVar")
-        expands = ("d.expand", "bb.data.expand", "data.expand")
-        execs = ("bb.build.exec_func", "bb.build.exec_task")
+        if not strparts:
+            return True
 
-        @classmethod
-        def _compare_name(cls, strparts, node):
-            """Given a sequence of strings representing a python name,
-            where the last component is the actual Name and the prior
-            elements are Attribute nodes, determine if the supplied node
-            matches.
-            """
-
-            if not strparts:
+        current, rest = strparts[0], strparts[1:]
+        if isinstance(node, ast.Attribute):
+            if current == node.attr:
+                return cls._compare_name(rest, node.value)
+        elif isinstance(node, ast.Name):
+            if current == node.id:
                 return True
+        return False
 
-            current, rest = strparts[0], strparts[1:]
-            if isinstance(node, ast.Attribute):
-                if current == node.attr:
-                    return cls._compare_name(rest, node.value)
-            elif isinstance(node, ast.Name):
-                if current == node.id:
-                    return True
-            return False
+    @classmethod
+    def compare_name(cls, value, node):
+        """Convenience function for the _compare_node method, which
+        can accept a string (which is split by '.' for you), or an
+        iterable of strings, in which case it checks to see if any of
+        them match, similar to isinstance.
+        """
 
-        @classmethod
-        def compare_name(cls, value, node):
-            """Convenience function for the _compare_node method, which
-            can accept a string (which is split by '.' for you), or an
-            iterable of strings, in which case it checks to see if any of
-            them match, similar to isinstance.
-            """
+        if isinstance(value, basestring):
+            return cls._compare_name(tuple(reversed(value.split("."))),
+                                     node)
+        else:
+            return any(cls.compare_name(item, node) for item in value)
 
-            if isinstance(value, basestring):
-                return cls._compare_name(tuple(reversed(value.split("."))),
-                                         node)
+    def __init__(self, value, metadata):
+        self.var_references = set()
+        self.var_execs = set()
+        self.direct_func_calls = set()
+        self.metadata = metadata
+        self.value = value
+        ast.NodeVisitor.__init__(self)
+
+    @classmethod
+    def warn(cls, func, arg):
+        """Warn about calls of bitbake APIs which pass a non-literal
+        argument for the variable name, as we're not able to track such
+        a reference.
+        """
+
+        try:
+            funcstr = codegen.to_source(func)
+            argstr = codegen.to_source(arg)
+        except TypeError:
+            msg.debug(2, None, "Failed to convert function and argument to source form")
+        else:
+            msg.debug(1, None, "Warning: in call to '%s', argument '%s' is not a literal" %
+                                 (funcstr, argstr))
+
+    def visit_Call(self, node):
+        ast.NodeVisitor.generic_visit(self, node)
+        if self.compare_name(self.getvars, node.func):
+            if isinstance(node.args[0], ast.Str):
+                self.var_references.add(node.args[0].s)
             else:
-                return any(cls.compare_name(item, node) for item in value)
-
-        def __init__(self, value, metadata):
-            self.var_references = set()
-            self.var_execs = set()
-            self.direct_func_calls = set()
-            self.metadata = metadata
-            self.value = value
-            ast.NodeVisitor.__init__(self)
-
-        @classmethod
-        def warn(cls, func, arg):
-            """Warn about calls of bitbake APIs which pass a non-literal
-            argument for the variable name, as we're not able to track such
-            a reference.
-            """
-
-            try:
-                funcstr = codegen.to_source(func)
-                argstr = codegen.to_source(arg)
-            except TypeError:
-                msg.debug(2, None, "Failed to convert function and argument to source form")
+                self.warn(node.func, node.args[0])
+        elif self.compare_name(self.expands, node.func):
+            if isinstance(node.args[0], ast.Str):
+                self.var_references.update(references(node.args[0].s,
+                                           self.metadata))
+            elif isinstance(node.args[0], ast.Call) and \
+                 self.compare_name(self.getvars, node.args[0].func):
+                pass
             else:
-                msg.debug(1, None, "Warning: in call to '%s', argument '%s' is not a literal" %
-                                     (funcstr, argstr))
+                self.warn(node.func, node.args[0])
+        elif self.compare_name(self.execs, node.func):
+            if isinstance(node.args[0], ast.Str):
+                self.var_execs.add(node.args[0].s)
+            else:
+                self.warn(node.func, node.args[0])
+        elif isinstance(node.func, ast.Name):
+            self.direct_func_calls.add(node.func.id)
+        elif isinstance(node.func, ast.Attribute):
+            # We must have a qualified name.  Therefore we need
+            # to walk the chain of 'Attribute' nodes to determine
+            # the qualification.
+            attr_node = node.func.value
+            identifier = node.func.attr
+            while isinstance(attr_node, ast.Attribute):
+                identifier = attr_node.attr + "." + identifier
+                attr_node = attr_node.value
+            if isinstance(attr_node, ast.Name):
+                identifier = attr_node.id + "." + identifier
+            self.direct_func_calls.add(identifier)
 
-        def visit_Call(self, node):
-            ast.NodeVisitor.generic_visit(self, node)
-            if self.compare_name(self.getvars, node.func):
-                if isinstance(node.args[0], ast.Str):
-                    self.var_references.add(node.args[0].s)
-                else:
-                    self.warn(node.func, node.args[0])
-            elif self.compare_name(self.expands, node.func):
-                if isinstance(node.args[0], ast.Str):
-                    self.var_references.update(references(node.args[0].s,
-                                               self.metadata))
-                elif isinstance(node.args[0], ast.Call) and \
-                     self.compare_name(self.getvars, node.args[0].func):
-                    pass
-                else:
-                    self.warn(node.func, node.args[0])
-            elif self.compare_name(self.execs, node.func):
-                if isinstance(node.args[0], ast.Str):
-                    self.var_execs.add(node.args[0].s)
-                else:
-                    self.warn(node.func, node.args[0])
-            elif isinstance(node.func, ast.Name):
-                self.direct_func_calls.add(node.func.id)
-            elif isinstance(node.func, ast.Attribute):
-                # We must have a qualified name.  Therefore we need
-                # to walk the chain of 'Attribute' nodes to determine
-                # the qualification.
-                attr_node = node.func.value
-                identifier = node.func.attr
-                while isinstance(attr_node, ast.Attribute):
-                    identifier = attr_node.attr + "." + identifier
-                    attr_node = attr_node.value
-                if isinstance(attr_node, ast.Name):
-                    identifier = attr_node.id + "." + identifier
-                self.direct_func_calls.add(identifier)
+class RefTracker(traverse.Visitor):
+    """Visitor to traverse a bbvalue tree, gathering references"""
 
     def __init__(self, metadata):
         self.execs = set()
@@ -156,7 +158,7 @@ class RefTracker(traverse.Visitor):
 
         code_obj = compile(code, "<string>", "exec", ast.PyCF_ONLY_AST)
 
-        self.visitor = self.ValueVisitor(node, self.metadata)
+        self.visitor = ValueVisitor(node, self.metadata)
         self.visitor.visit(code_obj)
 
         self.references.update(self.visitor.var_references)

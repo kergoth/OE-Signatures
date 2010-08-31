@@ -6,15 +6,7 @@ import re
 
 
 class Value(object):
-    """A simple value that is meant as a base class for all other values."""
-    def __eq__(self, other):
-        return isinstance(other, type(self))
-
-    def __ne__(self, other):
-        return not self == other
-
-    def __hash__(self):
-        return hash(id(self.metadata))
+    """Base class for other values"""
 
 class Literal(Value):
     """A simple value that resolves to whatever object it was initialized
@@ -25,7 +17,8 @@ class Literal(Value):
         self.value = value
 
     def __eq__(self, other):
-        return Value.__eq__(self, other) and self.value == other.value
+        return isinstance(other, type(self)) and \
+               self.value == other.value
 
     def __hash__(self):
         return hash(self.value)
@@ -43,7 +36,7 @@ class Compound(Value):
         self.field_components = components[:]
 
     def __eq__(self, other):
-        return Value.__eq__(self, other) and \
+        return isinstance(other, type(self)) and \
                self.field_components == other.field_components
 
     def __hash__(self):
