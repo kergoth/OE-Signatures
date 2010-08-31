@@ -54,6 +54,7 @@ class Signature(object):
             else:
                 self.blacklist = None
 
+        self.resolver = bbvalue.Resolver(self.metadata, False)
         self.blacklister = bbvalue.Blacklister(self.metadata, self.is_blacklisted)
         self.build_signature()
 
@@ -98,7 +99,7 @@ class Signature(object):
                     msg.error(None, "Unable to parse %s, excluding from signature: %s" %
                                  (key, exc))
                 else:
-                    yield key, value
+                    yield key, self.resolver.visit(value)
 
                     refs = reftracker.references(value, self.metadata)
                     refs |= reftracker.references_from_flags(key, self.metadata)
