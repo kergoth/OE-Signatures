@@ -103,6 +103,13 @@ class TestSimpleExpansions(unittest.TestCase):
         val = bbvalue.bbvalue("TEST", self.d)
         self.assertEqual(traverse.resolve(val, self.d), "5")
 
+    def test_resolver_unexpanded(self):
+        self.metadata.setVar("BAR", "beta")
+        self.metadata.setVar("FOO", "alpha ${BAR} theta")
+        resolver = traverse.Resolver(self.metadata, False)
+        resolved = resolver.visit(bbvalue.bbvalue("FOO", self.metadata))
+        self.assertEqual(resolved, "alpha ${BAR} theta")
+
 class TestNestedExpansions(unittest.TestCase):
     def setUp(self):
         self.d = bb.data.init()
@@ -217,31 +224,6 @@ class TestConditional(unittest.TestCase):
         self.metadata.setVar("OVERRIDES", "bar:local")
         self.assertEqual(traverse.resolve(value, self.metadata), "")
 
-class TestTransformer(unittest.TestCase):
-    def setUp(self):
-        self.metadata = bb.data.init()
-
-    def test_resolver_unexpanded(self):
-        self.metadata.setVar("BAR", "beta")
-        self.metadata.setVar("FOO", "alpha ${BAR} theta")
-        resolver = traverse.Resolver(self.metadata, False)
-        resolved = resolver.visit(bbvalue.bbvalue("FOO", self.metadata))
-        self.assertEqual(resolved, "alpha ${BAR} theta")
-
-    def test_resolver(self):
-        self.metadata.setVar("BAR", "beta")
-        self.metadata.setVar("FOO", "alpha ${BAR} theta")
-        resolver = traverse.Resolver(self.metadata, True)
-        resolved = resolver.visit(bbvalue.bbvalue("FOO", self.metadata))
-        self.assertEqual(resolved, "alpha beta theta")
-
-    def test_resolver_nested(self):
-        self.metadata.setVar("FOO", "BAR")
-        self.metadata.setVar("BAR", "alpha")
-        resolver = traverse.Resolver(self.metadata, True)
-        resolved = resolver.visit(bbvalue.bbparse("${${FOO}}"))
-        self.assertEqual(resolved, "alpha")
 
 if __name__ == "__main__":
     unittest.main()
-
