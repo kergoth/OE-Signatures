@@ -1,6 +1,6 @@
 import codegen
 import bbvalue
-import bb.data
+import traverse
 from pysh import pyshyacc, pyshlex
 from fnmatch import fnmatchcase
 from itertools import chain
@@ -9,7 +9,7 @@ from bb import msg, utils
 
 from pysh.sherrors import ShellSyntaxError
 
-class RefTracker(bbvalue.Visitor):
+class RefTracker(traverse.Visitor):
     class ValueVisitor(ast.NodeVisitor):
         """Visitor to traverse a python abstract syntax tree and obtain
         the variables referenced via bitbake metadata APIs, and the external
@@ -121,7 +121,7 @@ class RefTracker(bbvalue.Visitor):
         self.function_references = set()
         self.calls = None
         self.metadata = metadata
-        self.resolver = bbvalue.Resolver(metadata, True)
+        self.resolver = traverse.Resolver(metadata, True)
 
     @staticmethod
     def correct_indent(codestr):
@@ -302,7 +302,7 @@ def references_from_flags(varname, metadata):
     varrefs = metadata.getVarFlag(varname, "varrefs")
     if varrefs:
         refs.update(references(varrefs, metadata))
-        patterns = bbvalue.resolve(bbvalue.bbparse(varrefs), metadata).split()
+        patterns = traverse.resolve(bbvalue.bbparse(varrefs), metadata).split()
         for key in metadata.keys():
             if any(fnmatchcase(key, pat) for pat in patterns):
                 refs.add(key)

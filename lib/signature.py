@@ -1,6 +1,7 @@
 import hashlib
 import bbvalue
 import bb.data
+import traverse
 import reftracker
 from fnmatch import fnmatchcase
 from itertools import chain
@@ -18,11 +19,32 @@ def stable_repr(value):
     elif isinstance(value, tuple):
         return "(%s)" % ", ".join(stable_repr(value) for value in value)
     elif isinstance(value, bbvalue.Compound):
-        return "%s(%s)" % (value.__class__.__name__, 
+        return "%s(%s)" % (value.__class__.__name__,
                            stable_repr(value.field_components))
     elif isinstance(value, bbvalue.Literal):
         return "Literal('%s')" % str(value.value)
     return repr(value)
+
+class Blacklister(traverse.Transformer):
+    def __init__(self, metadata, is_blacklisted):
+        self.metadata = metadata
+        self.is_blacklisted = is_blacklisted
+        self.resolver = traverse.Resolver(metadata, True)
+        super(Blacklister, self).__init__()
+
+    def generic_visit(self, node):
+        newnode = super(Blacklister, self).generic_visit(node)
+        if node != newnode:
+            newnode.blacklisted = True
+        return newnode
+
+    def visit_VariableRef(self, node):
+        node = self.generic_visit(node)
+        name = self.resolver.generic_visit(node)
+        if hasattr(node, "blacklisted") or self.is_blacklisted(name):
+            return bbvalue.Literal("${%s}" % name)
+        else:
+            return node
 
 class Signature(object):
     """A signature is produced uniquely identifying part of the BitBake metadata.
@@ -54,8 +76,8 @@ class Signature(object):
             else:
                 self.blacklist = None
 
-        self.resolver = bbvalue.Resolver(self.metadata, False)
-        self.blacklister = bbvalue.Blacklister(self.metadata, self.is_blacklisted)
+        self.resolver = traverse.Resolver(self.metadata, False)
+        self.blacklister = Blacklister(self.metadata, self.is_blacklisted)
         self.build_signature()
 
     def __repr__(self):
@@ -95,8 +117,8 @@ class Signature(object):
                 try:
                     value = self.blacklister.visit(bbvalue.bbvalue(key, self.metadata))
                 except (SyntaxError, NotImplementedError,
-                        bbvalue.PythonExpansionError, 
-                        bbvalue.RecursionError), exc:
+                        traverse.PythonExpansionError,
+                        traverse.RecursionError), exc:
                     msg.error(None, "Unable to parse %s, excluding from signature: %s" %
                                  (key, exc))
                 else:
