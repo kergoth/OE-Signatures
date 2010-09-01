@@ -104,10 +104,10 @@ class TestSimpleExpansions(unittest.TestCase):
         self.assertEqual(traverse.resolve(val, self.d), "5")
 
     def test_resolver_unexpanded(self):
-        self.metadata.setVar("BAR", "beta")
-        self.metadata.setVar("FOO", "alpha ${BAR} theta")
-        resolver = traverse.Resolver(self.metadata, False)
-        resolved = resolver.visit(bbvalue.bbvalue("FOO", self.metadata))
+        self.d.setVar("BAR", "beta")
+        self.d.setVar("FOO", "alpha ${BAR} theta")
+        resolver = traverse.Resolver(self.d, False)
+        resolved = resolver.visit(bbvalue.bbvalue("FOO", self.d))
         self.assertEqual(resolved, "alpha ${BAR} theta")
 
 class TestNestedExpansions(unittest.TestCase):
