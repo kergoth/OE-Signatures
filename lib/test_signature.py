@@ -12,7 +12,6 @@ searchpath = [os.path.join(basedir, "lib"),
 sys.path[0:0] = searchpath
 
 import bb.data
-import bbvalue
 import signature
 
 class TestSignatureGeneration(unittest.TestCase):
@@ -101,31 +100,5 @@ class TestSignatureGeneration(unittest.TestCase):
         self.assertEquals(set(sig.data), set(["alpha", "foo5"]))
 
 
-class TestOEData(unittest.TestCase):
-    import pickle
-
-    def test_shasum(self):
-        import bb.fetch
-        import bb.parse
-        import bb.msg
-        import bb.utils
-        import os.path
-
-        if not os.path.exists("shasum-native-1.0-r1.vars"):
-            return
-
-        d = bb.data.init()
-        d.setVar("__RECIPEDATA", d)
-        d.setVar("BB_HASH_BLACKLIST", "__* *DIR *_DIR_* PATH PWD BBPATH FILE PARALLEL_MAKE")
-        vars = pickle.load(open("shasum-native-1.0-r1.vars", "rb"))
-        flags = pickle.load(open("shasum-native-1.0-r1.flags", "rb"))
-        for key, val in vars.iteritems():
-            d.setVar(key, val)
-            varflags = flags[key]
-            if varflags:
-                d.setVarFlags(key, flags[key])
-        print(signature.Signature(d))
-
 if __name__ == "__main__":
     unittest.main()
-

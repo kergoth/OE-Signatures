@@ -161,7 +161,6 @@ class TestMemoize(unittest.TestCase):
     def test_changed_after_memoized(self):
         d = bb.data.init()
         d.setVar("foo", "value of foo")
-        val = bbvalue.bbparse("${foo}")
         self.assertEqual(traverse.resolve(bbvalue.bbvalue("foo", d), d), "value of foo")
         d.setVar("foo", "second value of foo")
         self.assertEqual(traverse.resolve(bbvalue.bbvalue("foo", d), d), "second value of foo")

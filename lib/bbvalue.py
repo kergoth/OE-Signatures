@@ -163,7 +163,8 @@ def bbparse(str):
         variable_ref = re.compile(r"(\$\{@|\$\{|\})")
 
         def __init__(self, str):
-            self.tokens = [var for var in Tokenizer.variable_ref.split(str)                                    if var]
+            self.tokens = [var for var in Tokenizer.variable_ref.split(str)
+                               if var]
             self.i = 0
 
         def next(self):

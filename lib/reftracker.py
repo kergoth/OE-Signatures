@@ -205,8 +205,8 @@ class RefTracker(traverse.Visitor):
             # Element 0 of each item in the case is the list of patterns, and
             # Element 1 of each item in the case is the list of commands to be
             # executed when that pattern matches.
-            words = chain(*[item[0] for item in value.items])
-            cmds  = chain(*[item[1] for item in value.items])
+            words = chain.from_iterable(item[0] for item in value.items)
+            cmds = chain.from_iterable(item[1] for item in value.items)
             return cmds, words
 
         def if_clause(value):

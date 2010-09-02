@@ -54,7 +54,7 @@ class Signature(object):
     variables.
     """
 
-    def __init__(self, metadata, keys = None, blacklist = None):
+    def __init__(self, metadata, keys=None, blacklist=None):
         self._md5 = None
         self._data = None
         self._data_string = None
