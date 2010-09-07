@@ -130,6 +130,6 @@ class Signature(object):
                             yield other
 
         seen = set()
-        self.data = dict(chain(*[data_for_hash(key, seen) for key in self.keys]))
+        self.data = dict(chain.from_iterable(data_for_hash(key, seen) for key in self.keys))
         self.data_string = stable_repr(self.data)
         self.md5 = hashlib.md5(self.data_string)
