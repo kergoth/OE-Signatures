@@ -19,92 +19,127 @@ class TestSignatureGeneration(unittest.TestCase):
         self.d = bb.data.init()
         self.d["BB_HASH_BLACKLIST"] = "blacklisted*"
 
+    def assertSignatureMatches(self, signature, values=None, **kwargs):
+        if values:
+            kwargs.update(values)
+
+        self.assertEqual(signature.data, kwargs)
+
+    def assertSetEquals(self, iterable, iterable2):
+        self.assertEquals(set(iterable), set(iterable2))
+
+    def setVars(self, dictvalues=None, **values):
+        if dictvalues:
+            values.update(dictvalues)
+
+        for key, value in values.iteritems():
+            self.d.setVar(key, value)
+
+    def setVarFlags(self, variable, values=None, **flags):
+        if values:
+            flags.update(values)
+
+        for key, value in flags.iteritems():
+            self.d.setVarFlag(variable, key, value)
+
     def test_full_signature(self):
-        self.d.setVar("alpha", "echo ${TOPDIR}/foo \"$@\"")
-        self.d.setVarFlags("alpha", {"func": True, "task": True})
-        self.d.setVar("beta", "test -f bar")
-        self.d.setVarFlags("beta", {"func": True, "task": True})
-        self.d.setVar("theta", "alpha baz")
-        self.d.setVarFlags("theta", {"func": True, "task": True})
+        variables = dict(
+            alpha='echo ${TOPDIR}/foo "$@"',
+            beta='test -f bar',
+            theta='alpha baz',
+        )
+
+        self.setVars(variables)
+        self.setVarFlags("alpha", task=True)
+        self.setVarFlags("beta", task=True)
+        self.setVarFlags("theta", task=True)
+
         sig = signature.Signature(self.d)
-        self.assertEquals(sig.data_string, "{'alpha': ShellSnippet([Compound([Literal('echo '), VariableRef([Literal('TOPDIR')]), Literal('/foo \"$@\"')])]), 'beta': ShellSnippet([Compound([Literal('test -f bar')])]), 'theta': ShellSnippet([Compound([Literal('alpha baz')])])}")
+        self.assertSignatureMatches(sig, variables)
 
     def test_signature_blacklisted(self):
-        self.d["blacklistedvar"] = "blacklistedvalue"
-        self.d["testbl"] = "${@5} foo ${blacklistedvar} bar"
+        variables = dict(
+            blacklisted='value',
+            testbl='${@5} foo ${blacklisted} bar',
+        )
+
+        self.setVars(variables)
+
         sig = signature.Signature(self.d, keys=["testbl"])
-        self.assertEqual(sig.data_string, "{'testbl': Compound([Literal('5'), Literal(' foo '), VariableRef([Literal('blacklistedvar')]), Literal(' bar')])}")
+        self.assertSignatureMatches(sig, testbl='5 foo ${blacklisted} bar')
 
     def test_signature_only_blacklisted(self):
-        self.d["anotherval"] = "${blacklistedvar}"
+        variables = dict(anotherval='${blacklisted}')
+        self.setVars(variables)
+
         sig = signature.Signature(self.d, keys=["anotherval"])
-        self.assertEquals(sig.data_string, "{'anotherval': Compound([VariableRef([Literal('blacklistedvar')])])}")
+        self.assertSignatureMatches(sig, variables)
 
     def test_signature_undefined(self):
-        self.d["someval"] = "${undefinedvar} ${blacklistedvar} meh"
+        variables = dict(someval='${undefinedvar} ${blacklisted}')
+        self.setVars(variables)
+
         sig = signature.Signature(self.d, keys=["someval"])
-        self.assertEquals(sig.data_string, "{'someval': Compound([VariableRef([Literal('undefinedvar')]), Literal(' '), VariableRef([Literal('blacklistedvar')]), Literal(' meh')])}")
+        self.assertSignatureMatches(sig, variables)
 
     def test_signature_python_snippet(self):
-        locals = {}
+        context = {}
         self.d.setVar("testvar", "${@x()}")
-        bb.utils.simple_exec("globals()['x'] = lambda: 'alpha'", locals)
+        bb.utils.simple_exec("globals()['x'] = lambda: 'alpha'", context)
         sig = signature.Signature(self.d, keys=["testvar"])
         self.assertTrue(sig.data)
-        bb.utils.simple_exec("globals()['x'] = lambda: 'beta'", locals)
+
+        bb.utils.simple_exec("globals()['x'] = lambda: 'beta'", context)
         sig2 = signature.Signature(self.d, keys=["testvar"])
         self.assertTrue(sig2.data)
         self.assertNotEqual(sig.data, sig2.data)
 
     def test_signature_python_snippet_vars_as_locals(self):
-        self.d.setVar("foo", "bar")
-        self.d.setVar("bar", "baz")
-        self.d.setVar("test", "${@foo + '/baz'}")
-        sig = signature.Signature(self.d, keys=["test"])
-        self.assertEqual(sig.data, dict(foo="bar", test="bar/baz"))
+        variables = dict(
+            foo='bar',
+            bar='baz',
+            test='${@foo + "/baz"}',
+        )
+        self.setVars(variables)
 
-    def test_signature_oe_devshell(self):
-        self.d.setVar("do_devshell", "devshell_do_devshell")
-        self.d.setVarFlag("do_devshell", "func", True)
-        devshell = """
-                export TERMWINDOWTITLE="Bitbake Developer Shell"
-                ${TERMCMD}
-                if [ $? -ne 0 ]; then
-                    echo "Fatal: '${TERMCMD}' not found. Check TERMCMD variable."
-                    exit 1
-                fi
-        """
-        self.d.setVar("devshell_do_devshell", devshell)
-        self.d.setVarFlag("devshell_do_devshell", "func", True)
-        self.d.setVar("GNOME_TERMCMD", "gnome-terminal --disable-factory -t \"$TERMWINDOWTITLE\"")
-        self.d.setVar("TERMCMD", "${GNOME_TERMCMD}")
-        sig = signature.Signature(self.d, keys=["do_devshell"])
-        self.assertEquals(sig.md5.digest(),
-                          'x\xa3\xa6-\x11H:#\x1c\xe9\x82\xc2q\x19\xab\x9f')
+        sig = signature.Signature(self.d, keys=["test"])
+        self.assertSignatureMatches(sig, foo='bar', test='bar/baz')
 
     def test_reference_to_reference(self):
-        self.d.setVar("FOO", "-${BAR}-")
-        self.d.setVar("BAR", "+${BAZ}+")
-        self.d.setVar("BAZ", "alpha")
+        variables = dict(
+            FOO='-${BAR}-',
+            BAR='+${BAZ}+',
+            BAZ='alpha',
+        )
+        self.setVars(variables)
+
         sig = signature.Signature(self.d, keys=["FOO"])
-        self.assertEquals(set(sig.data.keys()), set(["FOO", "BAR", "BAZ"]))
+        self.assertSignatureMatches(sig, variables)
 
     def test_reference_to_reference_shell(self):
-        self.d.setVar("alpha", "echo; beta")
-        self.d.setVarFlag("alpha", "func", True)
-        self.d.setVar("beta", "theta; echo")
-        self.d.setVarFlag("beta", "func", True)
-        self.d.setVar("theta", "echo foo")
-        self.d.setVarFlag("theta", "func", True)
+        variables = dict(
+            alpha='echo; beta',
+            beta='theta; echo',
+            theta='echo foo',
+        )
+        self.setVars(variables)
+        self.setVarFlags("alpha", func=True)
+        self.setVarFlags("beta", func=True)
+        self.setVarFlags("theta", func=True)
+
         sig = signature.Signature(self.d, keys=["alpha"])
-        self.assertEquals(set(sig.data.keys()), set(["alpha", "beta", "theta"]))
+        self.assertSignatureMatches(sig, variables)
 
     def test_varrefs(self):
-        self.d.setVar("alpha", "${@bb.data.getVar('foo' + '5', d, True)}")
-        self.d.setVarFlag("alpha", "varrefs", "foo5")
-        self.d.setVar("foo5", "test")
+        variables = dict(
+            alpha='${@bb.data.getVar("foo" + "5", d, True)}',
+            foo5='test',
+        )
+        self.setVars(variables)
+        self.setVarFlags("alpha", varrefs="foo5")
+
         sig = signature.Signature(self.d, keys=["alpha"])
-        self.assertEquals(set(sig.data), set(["alpha", "foo5"]))
+        self.assertSignatureMatches(sig, alpha='test', foo5='test')
 
 
 if __name__ == "__main__":
