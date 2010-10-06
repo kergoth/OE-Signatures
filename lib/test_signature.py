@@ -56,6 +56,13 @@ class TestSignatureGeneration(unittest.TestCase):
         self.assertTrue(sig2.data)
         self.assertNotEqual(sig.data, sig2.data)
 
+    def test_signature_python_snippet_vars_as_locals(self):
+        self.d.setVar("foo", "bar")
+        self.d.setVar("bar", "baz")
+        self.d.setVar("test", "${@foo + '/baz'}")
+        sig = signature.Signature(self.d, keys=["test"])
+        self.assertEqual(sig.data, dict(foo="bar", test="bar/baz"))
+
     def test_signature_oe_devshell(self):
         self.d.setVar("do_devshell", "devshell_do_devshell")
         self.d.setVarFlag("do_devshell", "func", True)

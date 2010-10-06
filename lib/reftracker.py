@@ -57,8 +57,13 @@ class ValueVisitor(ast.NodeVisitor):
         self.var_references = set()
         self.var_execs = set()
         self.direct_func_calls = set()
+        self.names = set()
         self.metadata = metadata
         self.value = value
+        if hasattr(utils, "_context"):
+            self.context = utils._context
+        else:
+            self.context = __builtins__
         ast.NodeVisitor.__init__(self)
 
     @classmethod
@@ -76,6 +81,14 @@ class ValueVisitor(ast.NodeVisitor):
         else:
             msg.debug(1, None, "Warning: in call to '%s', argument '%s' is not a literal" %
                                  (funcstr, argstr))
+
+    def visit_Name(self, node):
+        name = node.id
+        if (name in self.context or
+            name in __builtins__ or
+            name == "d"):
+            return
+        self.names.add(node.id)
 
     def visit_Call(self, node):
         ast.NodeVisitor.generic_visit(self, node)
@@ -175,6 +188,7 @@ class RefTracker(traverse.Visitor):
     def visit_PythonValue(self, node):
         code = self.resolver.generic_visit(node)
         self.visit_PythonSnippet(node, code.strip())
+        self.references.update(self.visitor.names)
 
     def parse_shell(self, value):
         """Parse the supplied shell code in a string, returning the external
