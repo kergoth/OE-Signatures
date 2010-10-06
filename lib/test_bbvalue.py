@@ -76,24 +76,6 @@ class TestSimpleExpansions(unittest.TestCase):
         val = bbvalue.bbvalue("FOO", self.d)
         self.assertEqual(traverse.resolve(val, self.d), "bar value foo bar value")
 
-    def test_direct_recursion(self):
-        self.d.setVar("FOO", "${FOO}")
-        value = bbvalue.bbvalue("FOO", self.d)
-        self.assertRaises(traverse.RecursionError, str, value)
-
-    def test_indirect_recursion(self):
-        self.d.setVar("FOO", "${BAR}")
-        self.d.setVar("BAR", "${BAZ}")
-        self.d.setVar("BAZ", "${FOO}")
-        value = bbvalue.bbvalue("FOO", self.d)
-        self.assertRaises(traverse.RecursionError, str, value)
-
-    def test_recursion_exception(self):
-        self.d.setVar("FOO", "${BAR}")
-        self.d.setVar("BAR", "${${@'FOO'}}")
-        value = bbvalue.bbvalue("FOO", self.d)
-        self.assertRaises(traverse.RecursionError, str, value)
-
     def test_incomplete_varexp_single_quotes(self):
         val = bbvalue.shparse("sed -i -e 's:IP{:I${:g' $pc")
         self.assertEqual(traverse.resolve(val, self.d), "sed -i -e 's:IP{:I${:g' $pc")
