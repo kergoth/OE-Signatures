@@ -141,3 +141,8 @@ class Resolver(Transformer):
 def resolve(value, metadata, crossref=True):
     """Resolve a value using the supplied BitBake metadata"""
     return Resolver(metadata, crossref).visit(value)
+
+def expand(variable, metadata):
+    """Expand a variable from the metadata, given its name"""
+    value = bbvalue.bbvalue(variable, metadata)
+    return resolve(value, metadata)
