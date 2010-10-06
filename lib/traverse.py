@@ -85,12 +85,26 @@ class Transformer(Visitor):
         else:
             return node
 
+
+class MetadataMapping(dict):
+    def __init__(self, metadata, *args, **kwargs):
+        self.metadata = metadata
+        dict.__init__(self, *args, **kwargs)
+
+    def __missing__(self, key):
+        value = self.metadata.getVar(key, True)
+        if value is None:
+            raise KeyError(key)
+        return value
+
 class Resolver(Transformer):
     """Convert a bbvalue tree into a string, optionally resolving
        variable references"""
 
     def __init__(self, metadata, crossref=True):
         self.metadata = metadata
+        self.mapping = MetadataMapping(self.metadata)
+        self.mapping["d"] = metadata
         self.crossref = crossref
         super(Resolver, self).__init__()
 
@@ -126,8 +140,9 @@ class Resolver(Transformer):
     def visit_PythonValue(self, node):
         code = self.generic_visit(node)
         codeobj = compile(code.strip(), "<expansion>", "eval")
+
         try:
-            value = str(utils.better_eval(codeobj, {"d": self.metadata}))
+            value = str(utils.better_eval(codeobj, self.mapping))
         except Exception, exc:
             raise PythonExpansionError(exc, self)
         return self.visit(bbvalue.bbparse(value))
