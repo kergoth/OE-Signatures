@@ -144,7 +144,7 @@ class Resolver(Transformer):
         try:
             value = str(utils.better_eval(codeobj, self.mapping))
         except Exception, exc:
-            raise PythonExpansionError(exc, self)
+            raise PythonExpansionError(exc, code)
         return self.visit(bbvalue.bbparse(value))
 
     def visit_Conditional(self, node):
