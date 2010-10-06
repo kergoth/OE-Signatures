@@ -172,57 +172,6 @@ class TestMemoize(unittest.TestCase):
         self.assertEqual(bbvalue.bbvalue("foo", d),
                          bbvalue.bbvalue("bar", d))
 
-class TestLazy(unittest.TestCase):
-    def setUp(self):
-        self.metadata = bb.data.init()
-        self.metadata.setVar("FOO", "foo")
-        self.metadata.setVar("VAL", "val")
-        self.metadata.setVar("BAR", "bar")
-
-    def test_prepend(self):
-        value = bbvalue.LazyCompound()
-        value.append(bbvalue.bbvalue("VAL", self.metadata))
-        value.lazy_prepend(bbvalue.bbparse("${FOO}:"))
-        self.assertEqual(traverse.resolve(value, self.metadata), "foo:val")
-
-    def test_append(self):
-        value = bbvalue.LazyCompound()
-        value.append(bbvalue.bbvalue("VAL", self.metadata))
-        value.lazy_append(bbvalue.bbparse(":${BAR}"))
-        self.assertEqual(traverse.resolve(value, self.metadata), "val:bar")
-
-    def test_normal_append(self):
-        value = bbvalue.LazyCompound()
-        value.append(bbvalue.bbvalue("VAL", self.metadata))
-        value.lazy_prepend(bbvalue.bbparse("${FOO}:"))
-        value.lazy_append(bbvalue.bbparse(":${BAR}"))
-        value.append(bbvalue.bbparse(":val2"))
-        self.assertEqual(traverse.resolve(value, self.metadata), "foo:val:val2:bar")
-
-class TestConditional(unittest.TestCase):
-    def setUp(self):
-        self.metadata = bb.data.init()
-        self.metadata.setVar("OVERRIDES", "foo:bar:local")
-        self.metadata.setVar("TEST", "testvalue")
-
-    def test_no_condition(self):
-        value = bbvalue.Conditional(None,
-                                    [bbvalue.bbvalue("TEST", self.metadata)])
-        self.assertEqual(traverse.resolve(value, self.metadata), "testvalue")
-
-    def test_true_condition(self):
-        value = bbvalue.Conditional(
-                                    lambda d: 'foo' in d.getVar("OVERRIDES", True).split(":"),
-                                    [bbvalue.bbvalue("TEST", self.metadata)])
-        self.assertEqual(traverse.resolve(value, self.metadata), "testvalue")
-
-    def test_false_condition(self):
-        value = bbvalue.Conditional(
-                                    lambda d: 'foo' in d.getVar("OVERRIDES", True).split(":"),
-                                    [bbvalue.bbvalue("TEST", self.metadata)])
-        self.metadata.setVar("OVERRIDES", "bar:local")
-        self.assertEqual(traverse.resolve(value, self.metadata), "")
-
 
 if __name__ == "__main__":
     unittest.main()

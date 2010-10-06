@@ -68,38 +68,6 @@ class Compound(Value):
         for value in values:
             self.append(value)
 
-class LazyCompound(Compound):
-    """A Compound value which composes 3 independent lists of components:
-       prepended, normal, and appended.  This is specifically to facilitate
-       OpenEmbedded's _append/_prepend, which are not evaluated until the
-       end of the processing.  In this implementation, they're applied at
-       resolve time."""
-
-    def __init__(self, components=[], append=[], prepend=[]):
-        Compound.__init__(self, components)
-        self.field_prepend = prepend[:]
-        self.field_append = append[:]
-        self._fields = ["prepend", "components", "append"]
-
-    def __eq__(self, other):
-        return Compound.__eq__(self, other) and \
-               self.field_prepend == other.field_prepend and \
-               self.field_append == other.field_append
-
-    def __repr__(self):
-        return "%s(%s, %s, %s)" % (self.__class__.__name__,
-                                   repr(self.field_components),
-                                   repr(self.field_append),
-                                   repr(self.field_prepend))
-
-    def lazy_prepend(self, value):
-        """Add a value to the list of values to be prepended"""
-        return self._append(value, self.field_prepend)
-
-    def lazy_append(self, value):
-        """Add a value to the list of values to be appended"""
-        return self._append(value, self.field_append)
-
 class PythonValue(Compound):
     """A compound value that represents a value to be evaluated in Python.
        The resolution of a PythonValue takes the resolution of its
@@ -116,15 +84,6 @@ class ShellSnippet(Compound):
 class PythonSnippet(Compound):
     """A compound value which holds python code"""
 
-class Conditional(Compound):
-    """A Compound which resolves to its components only when the associated
-       condition is true.  The condition is a function which is passed the
-       metadata instance, and returns a boolean result.  A condition of 'None'
-       is equivalent to an unconditional value."""
-
-    def __init__(self, condition=None, components=[]):
-        super(Conditional, self).__init__(components)
-        self.condition = condition
 
 def bbvalue(varname, metadata):
     """Constructs a new value from a variable defined in the BitBake
