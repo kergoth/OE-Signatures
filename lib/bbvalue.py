@@ -67,7 +67,7 @@ class Value(object):
 
     def __eq__(self, other):
         return isinstance(other, type(self)) and \
-               self.metadata == other.metadata
+               self.metadata is other.metadata
 
     def __ne__(self, other):
         return not self == other
