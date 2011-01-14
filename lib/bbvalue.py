@@ -260,13 +260,13 @@ def bbvalue(varname, metadata):
     if strvalue is None:
         return None
 
+    if not isinstance(strvalue, basestring):
+        return Literal(metadata, strvalue)
+
     sigtup = (varname, strvalue, id(metadata))
 
     if sigtup in bbvalue.memory:
         return bbvalue.memory[sigtup]
-
-    if not isinstance(strvalue, basestring):
-        return Literal(metadata, strvalue)
 
     value = bbparse(strvalue, metadata)
     if metadata.getVarFlag(varname, "func"):
