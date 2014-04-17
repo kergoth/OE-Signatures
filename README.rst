@@ -155,5 +155,3 @@ Known Issues / Concerns
     actually defined in this same block of code.  We should try to do so,
     though it will be difficult to be full proof without taking into account
     contexts.
-
-..  vim: set et fenc=utf-8 sts=2 sw=2 :
